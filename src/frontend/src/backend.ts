@@ -285,6 +285,7 @@ export interface backendInterface {
     addInventoryEntry(productId: bigint, quantity: bigint, batch: string, supplierId: bigint): Promise<bigint>;
     addProduct(name: string, description: string, price: bigint, stockLevel: bigint, warehouse: string, rack: string, shelf: string, size: string, color: string, barcode: string): Promise<bigint>;
     addProductImage(productId: bigint, blob: ExternalBlob): Promise<void>;
+    addSecondaryAdminEmail(email: string): Promise<void>;
     assignAppRole(user: Principal, role: AppRole): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     batchExportBarcodes(arg0: BarcodeBatchExportRequest): Promise<ExternalBlob>;
@@ -334,8 +335,10 @@ export interface backendInterface {
     listNotifications(): Promise<Array<Notification>>;
     listOrders(): Promise<Array<OrderRecord>>;
     listProducts(): Promise<Array<Product>>;
+    listSecondaryAdminEmails(): Promise<Array<string>>;
     markNotificationAsRead(notificationId: bigint): Promise<boolean>;
     processPreviouslyRejectedUser(user: Principal): Promise<void>;
+    removeSecondaryAdminEmail(email: string): Promise<void>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
@@ -485,6 +488,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.addProductImage(arg0, await to_candid_ExternalBlob_n8(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async addSecondaryAdminEmail(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addSecondaryAdminEmail(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addSecondaryAdminEmail(arg0);
             return result;
         }
     }
@@ -1174,6 +1191,20 @@ export class Backend implements backendInterface {
             return from_candid_vec_n66(this._uploadFile, this._downloadFile, result);
         }
     }
+    async listSecondaryAdminEmails(): Promise<Array<string>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listSecondaryAdminEmails();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listSecondaryAdminEmails();
+            return result;
+        }
+    }
     async markNotificationAsRead(arg0: bigint): Promise<boolean> {
         if (this.processError) {
             try {
@@ -1199,6 +1230,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.processPreviouslyRejectedUser(arg0);
+            return result;
+        }
+    }
+    async removeSecondaryAdminEmail(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.removeSecondaryAdminEmail(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.removeSecondaryAdminEmail(arg0);
             return result;
         }
     }

@@ -303,10 +303,6 @@ actor {
   var nextNotificationId = 1;
 
   let STOCK_THRESHOLD = 5;
-  let SECONDARY_ADMIN_EMAIL = "sahilgarments16@gmail.com";
-
-  // Initialize secondary admin email
-  secondaryAdminEmails.add(SECONDARY_ADMIN_EMAIL);
 
   // Authentication and Access Control
   let accessControlState = AccessControl.initState();
@@ -325,16 +321,34 @@ actor {
     AccessControl.isAdmin(accessControlState, caller) and not isSecondaryAdmin(caller);
   };
 
-  // Helper function to check if email is secondary admin email
-  private func isSecondaryAdminEmail(email : Text) : Bool {
-    secondaryAdminEmails.contains(email);
+  // Public API for managing secondary admin emails (restricted to full admins)
+  public shared ({ caller }) func addSecondaryAdminEmail(email : Text) : async () {
+    if (not isPrimaryAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only primary/system admins can add secondary admin emails");
+    };
+    secondaryAdminEmails.add(email);
+  };
+
+  public shared ({ caller }) func removeSecondaryAdminEmail(email : Text) : async () {
+    if (not isPrimaryAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only primary/system admins can remove secondary admin emails");
+    };
+    if (not secondaryAdminEmails.contains(email)) {
+      Runtime.trap("Email is not currently registered as a secondary admin email");
+    };
+    secondaryAdminEmails.remove(email);
+  };
+
+  public shared query ({ caller }) func listSecondaryAdminEmails() : async [Text] {
+    if (not isPrimaryAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only primary/system admins can view secondary admin emails");
+    };
+    secondaryAdminEmails.toArray();
   };
 
   public query ({ caller }) func isSuperAdmin() : async Bool {
-    if (AccessControl.isAdmin(accessControlState, caller)) {
-      return true;
-    };
-    false;
+    // Returns true only for primary admins (not secondary admins)
+    isPrimaryAdmin(caller);
   };
 
   public query ({ caller }) func isAdmin() : async Bool {
@@ -614,7 +628,7 @@ actor {
     };
 
     // Check if email is secondary admin email
-    let isSecondaryAdminByEmail = isSecondaryAdminEmail(profile.email);
+    let isSecondaryAdminByEmail = secondaryAdminEmails.contains(profile.email);
 
     // Prevent users from assigning themselves admin role unless they are secondary admin by email
     switch (profile.appRole) {
@@ -908,13 +922,7 @@ actor {
 
   // RESTRICTED: Only primary admins can delete customers (excludes secondary admin)
   public shared ({ caller }) func deleteCustomer(customerId : Nat) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can delete customers");
-    };
-
-    if (isSecondaryAdmin(caller)) {
-      Runtime.trap("Unauthorized: Only primary admins can delete customers. Secondary admins cannot perform this operation.");
-    };
+    requirePrimaryAdmin(caller);
 
     switch (customers.get(customerId)) {
       case (null) {
@@ -1489,4 +1497,3 @@ actor {
     };
   };
 };
-

@@ -1,11 +1,11 @@
 {
   "frontend/src/App.tsx": "Main application component using batched bootstrap query for faster post-login routing with proper null checking, rendering immediate authenticated shell while data loads, and wrapping authenticated flows with PollingProvider for optimized query behavior.",
-  "frontend/src/hooks/useQueries.ts": "React Query hooks with batched bootstrap endpoint, conditional polling based on PollingContext, enhanced caching strategies, comprehensive data management operations including new useCreateInvoice and useStockAdjustInvoice hooks for invoice workflow with automatic stock adjustment.",
+  "frontend/src/hooks/useQueries.ts": "React Query hooks with batched bootstrap endpoint, conditional polling, comprehensive data management operations including useDashboardMetrics and useListDataEntries, plus new hooks for secondary admin email management (list, add, remove) and useIsSuperAdmin for primary admin role checking.",
   "frontend/src/pages/LoginPage.tsx": "Login page with Internet Identity authentication featuring English UI text and auto-login detection for returning users.",
   "frontend/src/components/ProfileSetup.tsx": "Profile setup form for new users to enter name, email, department, and role with validation and error handling, all UI text in English.",
-  "frontend/src/pages/Dashboard.tsx": "Dashboard layout component that enables polling on mount, tracks active module for conditional query behavior, and lazy-loads modules with proper Suspense boundaries for optimal performance.",
+  "frontend/src/pages/Dashboard.tsx": "Dashboard layout component with polling enablement, lazy-loaded modules including new SecondaryAdminAllowlistModule with primary-admin-only access gate, and proper Suspense boundaries for optimal performance.",
   "frontend/src/components/Header.tsx": "Application header with logo, user profile dropdown showing English role labels, theme toggle, and logout functionality.",
-  "frontend/src/components/Sidebar.tsx": "Navigation sidebar with role-based menu items in English, now including Invoice History menu item for Admin and Sales roles, supporting responsive mobile and desktop layouts with proper access control.",
+  "frontend/src/components/Sidebar.tsx": "Navigation sidebar with role-based menu items including new Admin Settings entry visible only to primary admins (isSuperAdmin), supporting responsive mobile and desktop layouts with proper access control.",
   "frontend/src/components/Footer.tsx": "Footer component with copyright and caffeine.ai attribution in English.",
   "frontend/src/components/modules/DashboardHome.tsx": "Enhanced admin dashboard with GPU-optimized animations, real-time metric cards with 10-second auto-refresh displaying total inventory, recent orders, low-stock alerts, transaction summaries, and new Total Customers card with real-time updates reflecting customer data changes after deletion operations.",
   "frontend/src/components/modules/CustomersModule.tsx": "Customer management module with admin-only delete functionality featuring confirmation dialogs with security warnings, real-time dashboard updates after deletion, and proper error handling for customer removal operations.",
@@ -29,5 +29,6 @@
   "frontend/tailwind.config.js": "Tailwind configuration with extended color palette including invoice-gold tokens for Sahil Garments invoice document theme, custom border radius, shadows, and animation keyframes.",
   "frontend/src/context/PollingContext.tsx": "Context provider that controls when React Query polling is enabled, tracking dashboard active state and current module to optimize query behavior and reduce unnecessary backend calls.",
   "frontend/src/components/AuthenticatedAppShell.tsx": "Immediate app shell component that renders header, sidebar placeholders, and loading state after login while bootstrap data loads, preventing blank screens during authentication flow.",
-  "frontend/src/utils/stockErrors.ts": "Utility module for detecting and formatting backend insufficient-stock errors into user-friendly English messages suitable for toast/dialog display."
+  "frontend/src/utils/stockErrors.ts": "Utility module for detecting and formatting backend insufficient-stock errors into user-friendly English messages suitable for toast/dialog display.",
+  "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx": "Primary-admin-only module for managing secondary admin email allowlist with add/remove functionality, email validation, confirmation dialogs, and comprehensive error handling with English UI text."
 }

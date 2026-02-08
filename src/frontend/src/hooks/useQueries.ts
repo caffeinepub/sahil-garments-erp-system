@@ -106,6 +106,7 @@ export function useSaveCallerUserProfile() {
       queryClient.invalidateQueries({ queryKey: ['isCallerAdmin'] });
       queryClient.invalidateQueries({ queryKey: ['isSecondaryAdmin'] });
       queryClient.invalidateQueries({ queryKey: ['canAccessUserManagement'] });
+      queryClient.invalidateQueries({ queryKey: ['isSuperAdmin'] });
       queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
     },
   });
@@ -119,6 +120,23 @@ export function useIsCallerAdmin() {
     queryFn: async () => {
       if (!actor) return false;
       return actor.isCallerAdmin();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: LONG_STALE_TIME,
+    gcTime: 300000,
+    retry: 1,
+  });
+}
+
+// Check if current user is primary admin (super admin)
+export function useIsSuperAdmin() {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<boolean>({
+    queryKey: ['isSuperAdmin'],
+    queryFn: async () => {
+      if (!actor) return false;
+      return actor.isSuperAdmin();
     },
     enabled: !!actor && !isFetching,
     staleTime: LONG_STALE_TIME,
@@ -163,6 +181,54 @@ export function useCanAccessUserManagement() {
     enabled: !isAdminLoading && !isSecondaryLoading && isAdmin !== undefined && isSecondaryAdmin !== undefined,
     staleTime: LONG_STALE_TIME,
     gcTime: 300000,
+  });
+}
+
+// Secondary Admin Email Management (Primary Admin Only)
+export function useListSecondaryAdminEmails() {
+  const { actor, isFetching } = useActor();
+  const polling = usePolling();
+
+  return useQuery<string[]>({
+    queryKey: ['secondaryAdminEmails'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listSecondaryAdminEmails();
+    },
+    enabled: !!actor && !isFetching && polling.isDashboardActive,
+    refetchInterval: polling.isDashboardActive ? NOTIFICATION_REFRESH_INTERVAL : false,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+export function useAddSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.addSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+    },
+  });
+}
+
+export function useRemoveSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.removeSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+    },
   });
 }
 
@@ -584,8 +650,6 @@ export function useCreateInvoice() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
       queryClient.invalidateQueries({ queryKey: ['profitLoss'] });
@@ -606,59 +670,8 @@ export function useStockAdjustInvoice() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
-  });
-}
-
-// Financial Data Queries
-export function useListDataEntries() {
-  const { actor, isFetching } = useActor();
-  const polling = usePolling();
-
-  return useQuery<DataEntry[]>({
-    queryKey: ['dataEntries'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listDataEntries();
-    },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-  });
-}
-
-export function useCreateDataEntry() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { entityType: string; entryId: bigint; amount: bigint; quantity: bigint }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.createDataEntry(data.entityType, data.entryId, data.amount, data.quantity);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dataEntries'] });
-    },
-  });
-}
-
-// Profit & Loss Report Query
-export function useGetProfitLossReport(startDate: Time, endDate: Time) {
-  const { actor, isFetching } = useActor();
-  const polling = usePolling();
-
-  return useQuery<ProfitLossReport>({
-    queryKey: ['profitLoss', startDate.toString(), endDate.toString()],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getProfitLossReport(startDate, endDate);
-    },
-    enabled: !!actor && !isFetching && !!startDate && !!endDate && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? INVOICE_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
   });
 }
 
@@ -691,12 +704,11 @@ export function useMarkNotificationAsRead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
   });
 }
 
-// Stats Query
+// Stats Queries
 export function useGetStats() {
   const { actor, isFetching } = useActor();
   const polling = usePolling();
@@ -714,75 +726,96 @@ export function useGetStats() {
   });
 }
 
-// Dashboard Metrics Query (batched for performance)
+// Dashboard Metrics (computed from multiple sources)
 export function useDashboardMetrics() {
-  const { actor, isFetching } = useActor();
-  const polling = usePolling();
+  const { data: stats } = useGetStats();
+  const { data: products = [] } = useListProducts();
+  const { data: invoices = [] } = useListInvoices();
+  const { data: orders = [] } = useListOrders();
+  const { data: notifications = [] } = useListNotifications();
+  const { data: approvals = [] } = useListApprovals();
 
   return useQuery({
-    queryKey: ['dashboardMetrics'],
+    queryKey: ['dashboardMetrics', stats, products, invoices, orders, notifications, approvals],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      const lowStockProducts = products.filter(p => Number(p.stockLevel) < 10);
+      const unreadNotifications = notifications.filter(n => !n.isRead);
+      const pendingApprovals = approvals.filter(a => a.status === 'pending' as any);
       
-      // Batch all queries for better performance
-      const [stats, approvals, orders, notifications, products, invoices] = await Promise.all([
-        actor.getStats(),
-        actor.listApprovals(),
-        actor.listOrders(),
-        actor.listNotifications(),
-        actor.listProducts(),
-        actor.listInvoices(),
-      ]);
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayTimestamp = BigInt(today.getTime() * 1000000);
+      
+      const todayRequests = approvals.filter(a => {
+        // Approximation: count all pending as today's requests
+        return a.status === 'pending' as any;
+      }).length;
 
-      const pendingApprovals = approvals.filter(a => a.status === 'pending' as any);
-      const todayRequests = pendingApprovals.length;
+      const recentOrders = orders.filter(o => {
+        const orderDate = new Date(Number(o.created) / 1000000);
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return orderDate >= sevenDaysAgo;
+      }).length;
 
-      // Calculate invoice metrics
-      const pendingInvoices = invoices.filter(i => i.status === 'draft' || i.status === 'sent').length;
-      const paidInvoices = invoices.filter(i => i.status === 'paid').length;
-      const unpaidInvoices = invoices.filter(i => i.status === 'sent').length;
-      const overdueInvoices = invoices.filter(i => i.status === 'overdue').length;
-
-      const unreadNotifications = notifications.filter(n => !n.isRead).length;
-
-      // Calculate low stock alerts (products with stock < 5 or status "low")
-      const lowStockAlerts = products.filter(p => Number(p.stockLevel) < 5 || p.inventoryStatus === 'low').length;
-
-      // Calculate recent orders (last 7 days)
-      const sevenDaysAgo = BigInt(Date.now() * 1000000) - BigInt(7 * 24 * 60 * 60 * 1000000000);
-      const recentOrders = orders.filter(o => o.created >= sevenDaysAgo).length;
-
-      // Calculate transaction summaries
-      const todayOrders = orders.filter(o => o.created >= todayTimestamp);
-      const todayTransactions = todayOrders.length;
-      const todayRevenue = todayOrders.reduce((sum, order) => sum + order.totalPrice, BigInt(0));
+      const pendingInvoices = invoices.filter(i => i.status === 'sent' as any || i.status === 'draft' as any).length;
+      const paidInvoices = invoices.filter(i => i.status === 'paid' as any).length;
+      const unpaidInvoices = invoices.filter(i => i.status === 'sent' as any).length;
+      const overdueInvoices = invoices.filter(i => i.status === 'overdue' as any).length;
 
       return {
-        totalUsers: Number(stats.totalCustomers),
+        totalUsers: pendingApprovals.length + approvals.filter(a => a.status === 'approved' as any).length,
+        totalOrders: stats?.totalOrders || BigInt(0),
+        totalInventory: stats?.totalInventory || BigInt(0),
+        totalRevenue: stats?.totalRevenue || BigInt(0),
+        lowStockAlerts: lowStockProducts.length,
+        unreadNotifications: unreadNotifications.length,
+        pendingApprovals: pendingApprovals.length,
         todayRequests,
+        recentOrders,
         pendingInvoices,
         paymentStatus: {
           paid: paidInvoices,
           unpaid: unpaidInvoices,
           overdue: overdueInvoices,
         },
-        unreadNotifications,
-        totalOrders: Number(stats.totalOrders),
-        totalRevenue: stats.totalRevenue,
-        totalInventory: Number(stats.totalInventory),
-        lowStockAlerts,
-        recentOrders,
-        todayTransactions,
-        todayRevenue,
       };
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive && polling.activeModule === 'dashboard',
-    refetchInterval: polling.isDashboardActive && polling.activeModule === 'dashboard' ? DASHBOARD_REFRESH_INTERVAL : false,
+    enabled: !!stats,
     staleTime: SHORT_STALE_TIME,
+  });
+}
+
+// Data Entry Queries
+export function useListDataEntries() {
+  const { actor, isFetching } = useActor();
+  const polling = usePolling();
+
+  return useQuery<DataEntry[]>({
+    queryKey: ['dataEntries'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listDataEntries();
+    },
+    enabled: !!actor && !isFetching && polling.isDashboardActive,
+    refetchInterval: polling.isDashboardActive ? DASHBOARD_REFRESH_INTERVAL : false,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+// Profit & Loss Report
+export function useGetProfitLossReport(startDate: Time, endDate: Time) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<ProfitLossReport>({
+    queryKey: ['profitLoss', startDate.toString(), endDate.toString()],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.getProfitLossReport(startDate, endDate);
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
     gcTime: 180000,
   });
 }

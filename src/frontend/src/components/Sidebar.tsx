@@ -14,6 +14,7 @@ import {
   ClipboardList,
   X,
   Receipt,
+  Settings,
 } from 'lucide-react';
 import { UserProfile } from '../backend';
 
@@ -23,6 +24,7 @@ interface SidebarProps {
   userProfile: UserProfile;
   isAdmin: boolean;
   canAccessUserManagement: boolean;
+  isSuperAdmin: boolean;
   isMobileOpen: boolean;
   onMobileClose: () => void;
 }
@@ -33,6 +35,7 @@ export default function Sidebar({
   userProfile,
   isAdmin,
   canAccessUserManagement,
+  isSuperAdmin,
   isMobileOpen,
   onMobileClose,
 }: SidebarProps) {
@@ -52,6 +55,7 @@ export default function Sidebar({
     { id: 'reports', label: 'Reports', icon: ClipboardList, show: canAccessFinancial },
     { id: 'notifications', label: 'Notifications', icon: Bell, show: true },
     { id: 'users', label: 'User Management', icon: UserCog, show: canAccessUserManagement },
+    { id: 'secondaryAdmins', label: 'Admin Settings', icon: Settings, show: isSuperAdmin },
   ];
 
   const handleModuleClick = (moduleId: string) => {

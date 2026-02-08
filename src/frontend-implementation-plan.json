@@ -1,6 +1,39 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "No frontend changes required for secondary admin Gmail update",
-  "requirements": []
+  "title": "Primary-admin-only secondary admin allowlist management UI",
+  "requirements": [
+    {
+      "id": "REQ-3",
+      "summary": "Add a primary-admin-only dashboard area to view/add/remove secondary admin allowlist emails using existing React Query patterns and backend methods, with strict UI gating for secondary admins.",
+      "acceptanceCriteria": [
+        "A primary admin can navigate to a settings/admin area and see a list of secondary admin emails, add a new email, and remove an existing email with confirmation.",
+        "Secondary admins do not see this management UI and cannot access it via direct navigation (route/module should be gated).",
+        "All user-facing text added/changed for this feature is in English.",
+        "Frontend uses existing React Query patterns (via frontend/src/hooks/useQueries.ts) to call the new backend APIs, including loading and error states."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add React Query hooks to integrate with backend capabilities for secondary admin allowlist management: listSecondaryAdminEmails (query), addSecondaryAdminEmail (mutation), removeSecondaryAdminEmail (mutation), plus a role-check hook for primary-admin gating using the existing backend capability isSuperAdmin(). Ensure hooks provide loading/error states and invalidate/refetch the allowlist on mutations. Use the authorization component’s role-based access control patterns for gating decisions; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx",
+          "operation": "create",
+          "description": "Create a new dashboard module UI for primary admins to manage the secondary admin email allowlist: display current emails, add email form with basic validation, and remove email action with confirmation dialog. Show clear loading and error states from React Query, and ensure all user-facing text is English. Use existing shadcn/ui components already present in the project (do not modify immutable ui components). Use the authorization component’s guidance for handling authorization errors gracefully; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Wire the new SecondaryAdminAllowlistModule into the dashboard module switch (e.g., a new module id under an admin/settings area), and add a primary-admin-only gate using the new isSuperAdmin hook. If a non-primary admin somehow navigates to this module id, render an in-module access denied state (or fallback to dashboard) to prevent access. Use the authorization component’s role-based access checks for gating; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/components/Sidebar.tsx",
+          "operation": "modify",
+          "description": "Add a new sidebar navigation item (e.g., \"Admin Settings\" / \"Secondary Admins\") that is only visible for primary admins (isSuperAdmin). Ensure secondary admins do not see the entry. Use the authorization component’s role-based access control patterns for conditional navigation; verify the component's usage instructions before implementing."
+        }
+      ]
+    }
+  ]
 }

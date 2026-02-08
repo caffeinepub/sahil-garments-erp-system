@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
-import { useGetCallerUserProfile, useIsCallerAdmin, useCanAccessUserManagement } from '../hooks/useQueries';
+import { useGetCallerUserProfile, useIsCallerAdmin, useCanAccessUserManagement, useIsSuperAdmin } from '../hooks/useQueries';
 import { usePolling } from '../context/PollingContext';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
@@ -17,6 +17,7 @@ const InvoiceModule = lazy(() => import('../components/modules/InvoiceModule'));
 const InvoiceHistoryModule = lazy(() => import('../components/modules/InvoiceHistoryModule'));
 const UserManagementModule = lazy(() => import('../components/modules/UserManagementModule'));
 const ReportsModule = lazy(() => import('../components/modules/ReportsModule'));
+const SecondaryAdminAllowlistModule = lazy(() => import('../components/modules/SecondaryAdminAllowlistModule'));
 
 function ModuleLoadingFallback() {
   return (
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const { data: userProfile } = useGetCallerUserProfile();
   const { data: isAdmin = false } = useIsCallerAdmin();
   const { data: canAccessUserManagement = false } = useCanAccessUserManagement();
+  const { data: isSuperAdmin = false } = useIsSuperAdmin();
   const [activeModule, setActiveModule] = useState('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -126,6 +128,25 @@ export default function Dashboard() {
             <UserManagementModule {...props} canAccessUserManagement={canAccessUserManagement} />
           </Suspense>
         );
+      case 'secondaryAdmins':
+        // Gate: Only primary admins can access
+        if (!isSuperAdmin) {
+          return (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <p className="text-lg font-semibold text-destructive">Access Denied</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Only primary admins can manage secondary admin settings.
+                </p>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <SecondaryAdminAllowlistModule />
+          </Suspense>
+        );
       default:
         return (
           <Suspense fallback={<ModuleLoadingFallback />}>
@@ -143,6 +164,7 @@ export default function Dashboard() {
         userProfile={userProfile}
         isAdmin={isAdmin}
         canAccessUserManagement={canAccessUserManagement}
+        isSuperAdmin={isSuperAdmin}
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
       />

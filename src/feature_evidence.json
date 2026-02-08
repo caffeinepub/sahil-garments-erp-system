@@ -1,4 +1,32 @@
 {
   "kind": "feature_evidence_report",
-  "features": []
+  "features": [
+    {
+      "featureId": "feature-expose-secondary-admin-allowlist-management-in-the-frontend-for-primary-admins-only-simple-ui-to-view-add-remove-secondary-admin-emails-and-ensure-secondary-admins-do-not-see-or-cannot-access-this-ui",
+      "featureTitle": "Expose secondary admin allowlist management in the frontend for primary admins only (simple UI to view/add/remove secondary admin emails), and ensure secondary admins do not see or cannot access this UI.",
+      "files": [
+        "frontend/src/components/Sidebar.tsx",
+        "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/Dashboard.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "qr-code@1.0.0",
+        "http-outcalls@3.0.0",
+        "user-approval@3.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
+      ],
+      "confidence": "high"
+    }
+  ]
 }

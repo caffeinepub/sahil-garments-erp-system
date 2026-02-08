@@ -1,33 +1,50 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-05T06:54:12.655Z",
-  "summary": "Diff adds a migration to insert sahilgarments16@gmail.com into secondaryAdminEmails, and wires a migration runner into backend/main.mo, but the provided truncated main.mo diff does not show (and therefore does not let us verify) that the configured secondary-admin email value is set to exactly sahilgarments16@gmail.com at startup or that the admin/secondary-admin privilege behavior is correctly applied. Unrequested changes include adding a new migration module and modifying project_state.json.",
+  "generatedAt": "2026-02-08T12:24:08.130Z",
+  "summary": "The diff adds a frontend module and query hooks for managing a secondary admin email allowlist and introduces a backend migration module, but the diff summary does not provide clear evidence that the backend canister implements the required secondary-admin principal assignment logic, the primary-admin-only allowlist management APIs, or the defined behavior when removing an email for already-assigned principals. Additionally, the diff summary indicates multiple unrelated ERP feature changes not requested.",
   "missing_requirements": [
     {
-      "id": "REQ-7",
-      "requirement": "Update the backend secondary-admin configuration so the secondary admin email is set to exactly \"sahilgarments16@gmail.com\" (and the secondary-admin email allowlist includes this value at startup).",
-      "reason": "The diff summary for backend/main.mo is truncated and does not show any explicit configuration/default value initialization for the secondary admin email (only a migration that adds an email to a set). Based on the visible diff alone, we cannot confirm the configured secondary-admin email value is set to exactly the required string at startup, nor can we confirm the resulting isAdmin/isSuperAdmin and user-management restriction behavior.",
+      "id": "REQ-1",
+      "requirement": "Backend: automatically add the caller principal to secondaryAdminPrincipals when saving a profile whose email is in the secondary admin allowlist; treat secondary admins as admin for normal checks but still fail requirePrimaryAdmin; ensure deterministic stable-state across upgrades.",
+      "reason": "The diff summary shows frontend changes and a migration file, but does not show any backend/main.mo logic implementing (a) adding principals on profile save based on the allowlist, (b) admin-check override behavior for secondary admins, or (c) stable persistence of secondaryAdminPrincipals across upgrades. backend/main.mo content in the summary is truncated and does not include relevant functions/logic.",
       "evidence": [
-        "backend/main.mo (truncated)",
+        "backend/main.mo (truncated; no visible secondary-admin logic)",
+        "frontend/src/hooks/useQueries.ts (mentions admin-related invalidations but not backend behavior)"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "requirement": "Backend: add primary-admin-only canister methods to list/add/remove secondary admin emails; changes take effect for future profile-saves; removal behavior for already-assigned principals is explicitly defined and implemented.",
+      "reason": "The frontend adds hooks and UI that presume these canister methods exist, but the diff summary does not show any backend canister methods for listing/adding/removing secondary admin emails, nor any explicit definition/implementation of what happens to already-assigned secondaryAdminPrincipals when an email is removed.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts (summary mentions new hooks for secondary admin email management, but backend methods are not shown)",
+        "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx (calls list/add/remove hooks)",
+        "backend/main.mo (truncated; no visible new management APIs)"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "requirement": "Backend: conditional upgrade migration preserves existing secondary admin email allowlist if present; if missing, initialize with default; upgrade should not trap due to missing fields/state.",
+      "reason": "A migration module is added, but the shown logic does not demonstrate the required conditional behavior ('preserve if exists, else init default'). It instead branches on whether old.SECONDARY_ADMIN_EMAIL equals the default, and otherwise uses old.secondaryAdminEmails, which does not clearly cover the 'stable state lacks allowlist' case described in the requirement.",
+      "evidence": [
         "backend/migration.mo"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Introduced a new backend migration module and wired a migration runner into the actor.",
-      "reason": "The BuildRequest only asked to update the secondary-admin email configuration in backend/main.mo; it did not request adding a migration system/file.",
+      "description": "Added/modified multiple ERP features unrelated to secondary admin allowlist management (e.g., GPU-optimized animations, real-time metric cards, customer delete updates, admin-only delete all orders/inventory, barcode/inventory enhancements, analytics module features).",
+      "reason": "These are outside the stated scope/non-goals (no new ERP business features unrelated to secondary admin). The diff summary explicitly lists such enhancements in the frontend file summaries.",
       "evidence": [
-        "backend/migration.mo",
-        "backend/main.mo (with migration = Migration.run)"
+        "frontend-file-summaries.txt"
       ]
     },
     {
-      "description": "Updated project_state.json feature summary/content (including documenting secondary admin configured email).",
-      "reason": "The BuildRequest did not request modifying project_state.json or any documentation/state metadata files.",
+      "description": "Introduced a frontend constant SECONDARY_ADMIN_EMAIL in useQueries.ts.",
+      "reason": "REQ-2 explicitly requires allowlist management without changing code constants; adding/retaining a frontend constant for the secondary admin email is not requested and may undermine the goal of managing the allowlist via backend APIs.",
       "evidence": [
-        "project_state.json"
+        "frontend/src/hooks/useQueries.ts"
       ]
     }
   ],
@@ -35,6 +52,11 @@
   "changed_files": [
     "backend/main.mo",
     "backend/migration.mo",
+    "frontend-file-summaries.txt",
+    "frontend/src/components/Sidebar.tsx",
+    "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/Dashboard.tsx",
     "project_state.json"
   ]
 }
