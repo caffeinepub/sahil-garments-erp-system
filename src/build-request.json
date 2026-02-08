@@ -1,0 +1,36 @@
+{
+  "kind": "build_request",
+  "title": "Update secondary admin Gmail ID to sahilgarments16@gmail.com",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-7",
+      "text": "Update the backend secondary-admin configuration so the secondary admin email is set to exactly \"sahilgarments16@gmail.com\" (and the secondary-admin email allowlist includes this value at startup).",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "second admin gmail id sahilgarments16@gmail.com please updated"
+        ]
+      },
+      "acceptanceCriteria": [
+        "In backend/main.mo, the configured secondary admin email value is \"sahilgarments16@gmail.com\".",
+        "A user who completes Profile Setup with email \"sahilgarments16@gmail.com\" is granted admin privileges (i.e., isAdmin/isSuperAdmin checks pass as applicable) and is treated as a secondary admin (restricted from User Management actions such as listApprovals/getAllUserAccounts/setApproval)."
+      ]
+    }
+  ],
+  "constraints": [
+    "Backend must remain a single Motoko actor; implement changes in backend/main.mo.",
+    "Do not edit any frontend files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui."
+  ],
+  "nonGoals": [
+    "Do not add a new UI for managing secondary admins unless explicitly requested.",
+    "Do not change the primary admin model or the existing approval workflow behavior for non-admin users."
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

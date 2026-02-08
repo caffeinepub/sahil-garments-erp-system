@@ -1,0 +1,431 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 20,
+  "summary": "Sahil Garments ERP System is a React (TypeScript) single-page ERP dashboard backed by an Internet Computer (DFINITY) Motoko canister. It provides role-based modules for customer management, product & inventory management (with locations), orders, invoices (creation + history + document generation), notifications, analytics, reporting (including Profit & Loss), barcode scanning and barcode export/generation. Authentication uses Internet Identity; backend access control supports an admin bootstrap token and a user approval workflow with a special-case 'secondary admin' that has admin powers but is restricted from User Management.",
+  "existing_features": [
+    {
+      "id": "IF-1",
+      "title": "Internet Identity authentication and session management",
+      "synonyms": [
+        "II login",
+        "AuthClient login",
+        "InternetIdentityProvider"
+      ],
+      "description": "Provides authentication via DFINITY Internet Identity using AuthClient. Manages login/logout, persists delegation identity, exposes login state flags, and supports long-lived sessions (up to ~30 days).",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-2",
+      "title": "Backend actor creation and access control initialization",
+      "synonyms": [
+        "useActor",
+        "canister actor bootstrap",
+        "admin token initialization"
+      ],
+      "description": "Creates an anonymous or authenticated backend actor based on identity. On actor creation it calls _initializeAccessControlWithSecret using a secret token read from URL hash/session (caffeineAdminToken), enabling admin bootstrap behavior in the canister.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-3",
+      "title": "User profile setup and persistence",
+      "synonyms": [
+        "ProfileSetup",
+        "saveCallerUserProfile"
+      ],
+      "description": "Allows authenticated users to create/update their profile (name, email, department, appRole). Saves to backend and updates dependent permission queries.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-4",
+      "title": "User approval workflow and approval-required gating",
+      "synonyms": [
+        "request approval",
+        "ApprovalPending",
+        "isCallerApproved"
+      ],
+      "description": "Non-admin users must be approved before using the ERP. Users can submit approval requests; UI gates access to dashboard modules until approved. Backend enforces approval checks and blocks previously rejected users.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-5",
+      "title": "Primary vs secondary admin model",
+      "synonyms": [
+        "secondary admin email",
+        "restricted admin",
+        "canAccessUserManagement"
+      ],
+      "description": "Implements a special secondary admin identified by a configured email (sahilgarments16@gmail.com). Secondary admins can access most modules but are restricted from User Management and certain admin-only destructive operations. Both frontend and backend include checks for this distinction.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-6",
+      "title": "Admin-only user management (approvals list, approve/reject, view profiles)",
+      "synonyms": [
+        "UserManagementModule",
+        "listApprovals",
+        "setApproval"
+      ],
+      "description": "Primary admins can view approval requests, filter/sort them, view user profiles by principal, and approve/reject users (including revoking access by rejecting previously approved users). Actions generate notifications for both admin and affected user.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-7",
+      "title": "Role-based navigation and module access control",
+      "synonyms": [
+        "Sidebar RBAC",
+        "module guards"
+      ],
+      "description": "Shows/hides sidebar menu items based on appRole and admin status (sales, inventoryManager, accountant, admin), and displays access denied messages in restricted modules.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-8",
+      "title": "Real-time data synchronization via React Query",
+      "synonyms": [
+        "auto-refresh",
+        "invalidateQueries",
+        "dashboard refresh"
+      ],
+      "description": "Uses configured refetch intervals and invalidations across customers, products, inventory, orders, invoices, notifications, stats, dashboard metrics, and profit/loss to keep the UI updated roughly every 10–15 seconds.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-9",
+      "title": "Dashboard home with batched metrics and activity widgets",
+      "synonyms": [
+        "DashboardHome",
+        "useDashboardMetrics"
+      ],
+      "description": "Displays KPI cards (users/customers, requests, invoice counts/statuses, inventory, low stock alerts, orders/revenue) and recent activity/notifications. Metrics are computed by batching multiple backend calls and deriving counts (unread notifications, low stock, recent orders, today's revenue).",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-10",
+      "title": "Customer management (list/create/delete with admin restriction)",
+      "synonyms": [
+        "CustomersModule",
+        "createCustomer",
+        "deleteCustomer"
+      ],
+      "description": "Sales/Admin can create customers and view the customer directory with search. Deletion is restricted to primary admins and uses confirmation dialogs; backend emits a notification on deletion.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-11",
+      "title": "Product catalog and inventory management",
+      "synonyms": [
+        "InventoryModule",
+        "addProduct",
+        "updateProduct",
+        "listProducts"
+      ],
+      "description": "Inventory managers/Admins can add and edit products with attributes (name, description, price, stock level, size, color, barcode, and location fields). Products are searchable and display low-stock status/alerts.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-12",
+      "title": "Inventory records and bulk inventory deletion",
+      "synonyms": [
+        "listInventory",
+        "addInventoryEntry",
+        "deleteAllInventory"
+      ],
+      "description": "Supports listing inventory records and adding inventory entries (batch/supplier/quantity). Admins can delete all inventory (products + inventory + locations) via a destructive confirmation flow.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-13",
+      "title": "Inventory location storage and retrieval",
+      "synonyms": [
+        "setProductLocation",
+        "getProductLocation"
+      ],
+      "description": "Stores per-product warehouse/rack/shelf location information and provides read/write APIs guarded by inventory permissions.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-14",
+      "title": "Camera abstraction and QR/barcode scanning",
+      "synonyms": [
+        "useCamera",
+        "useQRScanner",
+        "camera scanner"
+      ],
+      "description": "Provides reusable camera lifecycle management and QR scanning using the jsQR library loaded from CDN. Exposes scanning state, start/stop/switch camera actions, and stores recent scan results.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-15",
+      "title": "Barcode scanner stock IN/OUT operations",
+      "synonyms": [
+        "BarcodeModule",
+        "increment/decrement stock via scan"
+      ],
+      "description": "Inventory managers/Admins can scan product barcodes and confirm stock IN/OUT operations that adjust Product.stockLevel by ±1 via updateProduct, with confirmation dialogs and real-time updates.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-16",
+      "title": "Barcode generation and export (PNG/PDF) for products",
+      "synonyms": [
+        "BarcodeGenerator",
+        "InventoryReportModule barcodes"
+      ],
+      "description": "Generates Code128 and QR codes for a product and allows downloading as PNG or PDF. Inventory reporting can batch-generate barcodes for all products and export as a combined PDF or as multiple PNG downloads, with retry for failures and validation checks.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-17",
+      "title": "Orders management (list, filtering, create, delete-all)",
+      "synonyms": [
+        "OrdersModule",
+        "createOrder",
+        "listOrders"
+      ],
+      "description": "Sales/Admin can list and filter orders, place new orders with product/customer selection and client-side stock availability checks, and admins can delete all orders via a destructive confirmation flow.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-18",
+      "title": "Invoice creation UI with GST calculations and WhatsApp sharing",
+      "synonyms": [
+        "InvoiceModule",
+        "invoice builder",
+        "invoice preview"
+      ],
+      "description": "Sales/Accountant/Admin can assemble invoice items with quantity and discount, compute subtotal/GST/grand total, preview a mock invoice document, and trigger backend order creation per item. Includes WhatsApp share link generation; SMS/email actions are placeholders.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-19",
+      "title": "Invoice document generation (PNG + PDF) via Canvas",
+      "synonyms": [
+        "InvoiceGenerator",
+        "invoice PDF generator"
+      ],
+      "description": "Generates branded invoice images using Canvas drawing, optionally embeds a signature image, and creates downloadable PDFs using jsPDF loaded from CDN. Supports regeneration and download actions.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-20",
+      "title": "Invoice history with advanced filtering, sorting, preview, and CSV export",
+      "synonyms": [
+        "InvoiceHistoryModule",
+        "invoice list",
+        "CSV export"
+      ],
+      "description": "Admin/Sales can view invoice list with filters (search, date ranges, customer, status), sortable columns, preview invoices via InvoiceGenerator, and export filtered data as CSV (PDF export is stubbed with messaging).",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-21",
+      "title": "Notification center with read/unread state",
+      "synonyms": [
+        "NotificationsModule",
+        "markNotificationAsRead"
+      ],
+      "description": "Lists notifications, sorts by timestamp, shows unread counts, allows marking notifications as read, and supports manual refresh. Backend restricts non-admin users to their own notifications and allows admins to see all.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-22",
+      "title": "Analytics dashboards for business insights",
+      "synonyms": [
+        "AnalyticsModule",
+        "charts"
+      ],
+      "description": "Displays charts and KPI cards for customers, orders, inventory, and (for admin/accountant) revenue trends and top products by revenue using Recharts.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-23",
+      "title": "Reports module (sales, stock, low-stock alerts, inventory barcode report, profit & loss)",
+      "synonyms": [
+        "ReportsModule",
+        "report tabs"
+      ],
+      "description": "Accountant/Admin reporting area with tabbed views: sales report (orders), stock report (inventory records), low-stock alerts, inventory barcodes (InventoryReportModule), and Profit & Loss (ProfitLossModule). Export actions for some reports are UI placeholders.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-24",
+      "title": "Profit & Loss backend report computation",
+      "synonyms": [
+        "getProfitLossReport",
+        "P&L API"
+      ],
+      "description": "Backend provides getProfitLossReport(startDate, endDate) for admin/accountant, computing revenue/COGS from paid invoices within the date range and returning gross/net profit metrics (with a fixed operational expense).",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-25",
+      "title": "Backend infrastructure: HTTP outcalls helper and blob storage gateway mixin",
+      "synonyms": [
+        "http_request outcall",
+        "caffeine storage mixin",
+        "cycles refill"
+      ],
+      "description": "Provides shared utilities for canister HTTP GET/POST with response transforms, and a storage mixin for authorized gateway principals, dead-blob pruning, and cycle refilling via a cashier canister principal.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-26",
+      "title": "Non-blocking authenticated boot flow with app shell UI",
+      "synonyms": [
+        "AuthenticatedAppShell",
+        "LoadingWorkspace",
+        "faster startup shell"
+      ],
+      "description": "Refactors the post-login startup experience so the UI renders an authenticated shell immediately and progressively resolves profile/approval/admin gating states (login → profile setup → approval pending → dashboard) without a full blank-screen block during sequential startup queries.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "IF-27",
+      "title": "Batched backend bootstrapping state API for startup gating",
+      "synonyms": [
+        "bootstrap state",
+        "single-call startup state",
+        "get caller state (profile/approved/admin)"
+      ],
+      "description": "Adds a backend API to retrieve the caller's initial bootstrapping state in a single call (at minimum userProfile, approval status, and admin status) and updates the frontend startup gating to use this batched call to reduce round trips after authentication.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "IF-28",
+      "title": "Module-aware polling controls to defer high-frequency refetch on launch",
+      "synonyms": [
+        "PollingContext",
+        "deferred refetch intervals",
+        "optimize React Query polling"
+      ],
+      "description": "Introduces centralized polling controls so high-frequency React Query refetch intervals (e.g., 10–15s) are deferred until the user reaches the dashboard and/or the relevant module is active, reducing unnecessary network work during app launch.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "IF-29",
+      "title": "Backend atomic stock decrement on invoice creation with insufficient-stock rejection",
+      "synonyms": [
+        "invoice-driven stock update",
+        "atomic inventory decrement",
+        "fail-on-negative stock"
+      ],
+      "description": "Backend updates product stock automatically based on invoice line items/quantities during invoice creation. The operation validates all items up-front and rejects the invoice creation with a clear error if any item would cause stock to go below zero, ensuring no partial updates occur.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
+    },
+    {
+      "id": "IF-30",
+      "title": "Frontend invoice workflow messaging and insufficient-stock error handling",
+      "synonyms": [
+        "stockErrors",
+        "invoice submit error toast",
+        "accurate stock update messaging"
+      ],
+      "description": "Frontend invoice/order UI messaging was updated to reflect backend automatic stock updates. When the backend rejects an invoice due to insufficient stock, the UI surfaces a clear English error (toast/dialog) instead of failing silently or showing inaccurate messaging.",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Improve app performance so it opens faster (optimize startup/login and overall load speed).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Automatically reduce inventory stock when an invoice is created and/or when an order is confirmed (user requested trigger on invoice creation or both).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "If the system supports an explicit 'order confirmed' transition, also decrease stock when an order is confirmed, but ensure stock is not decreased twice for the same order/invoice pair. The backend must be idempotent across these two triggers (invoice creation vs order confirmation) so that using both flows cannot double-decrement stock.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Update the backend secondary-admin configuration so the secondary admin email is set to exactly \"sahilgarments16@gmail.com\" (and the secondary-admin email allowlist includes this value at startup).",
+      "reqIds": [
+        "REQ-7"
+      ],
+      "status": "pending"
+    }
+  ],
+  "architectural_notes": [
+    "Frontend is a React SPA using @tanstack/react-query for data fetching, caching, invalidation, and periodic refetch for near-real-time UI updates (10–15s intervals).",
+    "Frontend modules are code-split with React.lazy + Suspense; the main Dashboard swaps modules via local state rather than URL routing.",
+    "Backend is a Motoko canister with in-memory state using mo:core Map/Set; exposes shared/query methods for CRUD and reporting.",
+    "Backend access control is implemented via an AccessControl state and an authorization mixin (MixinAuthorization), initialized with an environment-provided admin token and a user-provided secret.",
+    "User approval workflow is backed by a separate approval state module (user-approval/approval.mo), and enforced via requireApprovedUser/requireApprovedUserQuery guards.",
+    "Role-based authorization is enforced both server-side (canAccessSales/canAccessInventory/canAccessFinancial, requirePrimaryAdmin) and client-side (Sidebar/module guards based on userProfile.appRole and isAdmin queries).",
+    "Secondary admin concept is implemented on both frontend and backend: identified by a hard-coded email and restricted from User Management and certain destructive operations.",
+    "Dashboard metrics are computed via a batched React Query call (Promise.all across multiple actor calls) to reduce request overhead.",
+    "Document generation (invoices, barcodes) is implemented client-side using HTML5 Canvas and dynamically loaded CDN libraries (JsBarcode, qrcode, jsPDF).",
+    "Camera access is abstracted into hooks (useCamera, useQRScanner) with capability detection, lifecycle cleanup, and scan interval processing."
+  ],
+  "known_issues": [
+    "Backend inventory entries (InventoryRecord) do not reconcile with Product.stockLevel; stock level is updated via updateProduct from the frontend (e.g., barcode IN/OUT), which can diverge from inventory records.",
+    "Low-stock thresholds are inconsistent: backend STOCK_THRESHOLD=5 for product inventoryStatus, while frontend alerts often use <10 units.",
+    "Several backend export endpoints intentionally trap (exportInvoiceHistory, exportProductBarcode, batchExportBarcodes), meaning exports are frontend-only and the backend API surface is incomplete for those operations.",
+    "Dynamic CDN script loading (JsBarcode/QRCode/jsPDF) is repeated in multiple components; potential for duplicate loads and lack of robust cleanup/version pinning beyond URL strings.",
+    "Type mismatch workarounds exist in frontend (useSetApproval casts approval status to 'approved'/'rejected'/'pending' as any), which may hide interface drift between generated types and backend expectations.",
+    "There are environment-variable name typos/inconsistencies in backend storage code (e.g., CAFFFEINE_STORAGE_CASHIER_PRINCIPAL has triple 'F'), which could cause runtime traps if deployment env vars differ.",
+    "Two different CSS variable theme definitions appear (frontend/src/index.css and frontend/index.css); depending on bundling/imports, styles may conflict or be redundant."
+  ],
+  "isFixRequest": false,
+  "generatedImages": [
+    {
+      "filename": "frontend/public/assets/generated/sahil-garments-logo.dim_900x300.png",
+      "description": "Generated resized/dimmed Sahil Garments logo asset for frontend branding.",
+      "targetWidth": 900,
+      "targetHeight": 300
+    }
+  ],
+  "gameProjectType": "none",
+  "projectName": "Sahil Garments ERP System",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}
