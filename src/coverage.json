@@ -1,49 +1,64 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T12:24:08.133Z",
+  "generatedAt": "2026-02-08T13:00:21.603Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
     "total": 4,
-    "implemented": 1,
+    "implemented": 3,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Update the backend secondary-admin model so the designated secondary admin (by email) is automatically recognized as an admin principal after they complete profile setup, while still being restricted from primary-admin-only actions (e.g., user approvals / user management).",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Reduce initial page-load work so the app becomes usable as quickly as possible after launch (both on first open and on refresh), while preserving existing authentication/approval flows.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/App.tsx",
+          "frontend/src/pages/Dashboard.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/App.tsx",
+          "frontend/src/pages/Dashboard.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ]
       },
       {
         "id": "REQ-2",
-        "summary": "Add backend management APIs for primary admins to update the secondary admin email allowlist (add/remove/list) without changing code constants, and ensure changes take effect for new logins/profile-saves.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Optimize dashboard polling and re-render behavior to reduce CPU/network usage during normal use and especially on app open, including pausing background polling when not needed.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/context/PollingContext.tsx",
+          "frontend/src/pages/Dashboard.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/modules/DashboardHome.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/context/PollingContext.tsx",
+          "frontend/src/pages/Dashboard.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/modules/DashboardHome.tsx"
+        ]
       },
       {
         "id": "REQ-3",
-        "summary": "Expose secondary admin allowlist management in the frontend for primary admins only (simple UI to view/add/remove secondary admin emails), and ensure secondary admins do not see or cannot access this UI.",
+        "summary": "Ensure large/heavy UI modules and third-party libraries are not part of the initial bundle and are only downloaded when the user navigates to the relevant module or opens the relevant dialog.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx",
           "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/components/Sidebar.tsx"
+          "frontend/src/components/InvoiceGenerator.tsx",
+          "frontend/src/components/modules/InventoryReportModule.tsx",
+          "frontend/src/components/BarcodeGenerator.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/components/Sidebar.tsx"
+          "frontend/src/pages/Dashboard.tsx"
         ]
       },
       {
         "id": "REQ-4",
-        "summary": "If the project already has deployed state that relied on a previous secondary-admin default email migration, add/adjust conditional upgrade migration logic so existing deployments retain the current secondary admin email allowlist and do not lose configured secondary admin emails during upgrade.",
+        "summary": "Keep the backend bootstrap endpoint fast and minimal to support quick app open; avoid adding expensive computations or large data payloads to getBootstrapState.",
         "status": "unknown",
         "plannedFiles": [],
         "matchedFiles": []
@@ -52,18 +67,15 @@
   },
   "changedFiles": [
     "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
-    "caffeine.lock.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/components/Sidebar.tsx",
-    "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
+    "frontend/src/App.tsx",
+    "frontend/src/components/modules/DashboardHome.tsx",
+    "frontend/src/components/modules/InvoiceModule.tsx",
+    "frontend/src/components/modules/UserManagementModule.tsx",
+    "frontend/src/context/PollingContext.tsx",
     "frontend/src/hooks/useQueries.ts",
     "frontend/src/pages/Dashboard.tsx",
     "project_state.json",

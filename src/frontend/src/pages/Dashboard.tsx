@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import Footer from '../components/Footer';
 import { Loader2 } from 'lucide-react';
+import type { UserProfile } from '../backend';
 
 const DashboardHome = lazy(() => import('../components/modules/DashboardHome'));
 const CustomersModule = lazy(() => import('../components/modules/CustomersModule'));
@@ -30,20 +31,29 @@ function ModuleLoadingFallback() {
   );
 }
 
-export default function Dashboard() {
-  const { data: userProfile } = useGetCallerUserProfile();
-  const { data: isAdmin = false } = useIsCallerAdmin();
+interface DashboardProps {
+  initialUserProfile?: UserProfile;
+  initialIsAdmin?: boolean;
+}
+
+export default function Dashboard({ initialUserProfile, initialIsAdmin }: DashboardProps) {
+  // Use initial data from bootstrap to avoid redundant queries
+  const { data: userProfile = initialUserProfile } = useGetCallerUserProfile();
+  const { data: isAdmin = initialIsAdmin ?? false } = useIsCallerAdmin();
   const { data: canAccessUserManagement = false } = useCanAccessUserManagement();
   const { data: isSuperAdmin = false } = useIsSuperAdmin();
   const [activeModule, setActiveModule] = useState('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
-  const { enablePolling, setActiveModule: setPollingModule } = usePolling();
+  const { enablePolling, disablePolling, setActiveModule: setPollingModule } = usePolling();
 
-  // Enable polling when Dashboard mounts
+  // Enable polling when Dashboard mounts, disable on unmount
   useEffect(() => {
     enablePolling();
-  }, [enablePolling]);
+    return () => {
+      disablePolling();
+    };
+  }, [enablePolling, disablePolling]);
 
   // Update active module in polling context
   useEffect(() => {

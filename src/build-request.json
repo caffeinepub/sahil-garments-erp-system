@@ -1,92 +1,88 @@
 {
   "kind": "build_request",
-  "title": "Update secondary (second) admin setup and permissions",
+  "title": "Improve app performance for faster loading and quicker open time",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Update the backend secondary-admin model so the designated secondary admin (by email) is automatically recognized as an admin principal after they complete profile setup, while still being restricted from primary-admin-only actions (e.g., user approvals / user management).",
-      "target": "backend",
+      "text": "Reduce initial page-load work so the app becomes usable as quickly as possible after launch (both on first open and on refresh), while preserving existing authentication/approval flows.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "recent-messages"
+          "msg-1"
         ],
         "quotes": [
-          "please updated second admin"
+          "please fast loading aap  and speed open"
         ]
       },
       "acceptanceCriteria": [
-        "If a user saves a profile whose email is in the secondary admin email allowlist (currently initialized with SECONDARY_ADMIN_EMAIL = \"sahilgarments16@gmail.com\"), that caller principal is added to the backend’s secondaryAdminPrincipals set.",
-        "The secondary admin is treated as an admin for normal admin checks (e.g., AccessControl.isAdmin / hasAppRole admin override), but calls guarded by requirePrimaryAdmin continue to fail for secondary admins with the existing error message about primary admin privileges.",
-        "Secondary admin state is deterministic across reloads/upgrades according to the existing stable-state approach used by the canister (no regression where the secondary admin loses admin status after an upgrade)."
+        "When the user is authenticated, the UI shows an immediate app shell (header/sidebar/skeletons) without waiting for non-essential data beyond the existing getBootstrapState call.",
+        "No module-specific data queries (orders/inventory/invoices/analytics/reports/etc.) start fetching until the Dashboard page is mounted and a module that needs them is active.",
+        "The Login/Profile Setup/Approval Pending screens continue to load via lazy loading (no regression from current Suspense behavior)."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Add backend management APIs for primary admins to update the secondary admin email allowlist (add/remove/list) without changing code constants, and ensure changes take effect for new logins/profile-saves.",
-      "target": "backend",
+      "text": "Optimize dashboard polling and re-render behavior to reduce CPU/network usage during normal use and especially on app open, including pausing background polling when not needed.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "recent-messages"
+          "msg-1"
         ],
         "quotes": [
-          "please updated second admin"
+          "please fast loading aap  and speed open"
         ]
       },
       "acceptanceCriteria": [
-        "There are canister methods for primary admins to: (1) list secondary admin emails, (2) add a secondary admin email, and (3) remove a secondary admin email.",
-        "All new methods reject calls from secondary admins and non-admins using the same primary-admin restriction behavior as other user-management actions.",
-        "When a primary admin adds an email and that user later saves/updates their profile with that email, they become recognized as the secondary admin principal automatically.",
-        "Removing an email prevents future automatic secondary-admin assignment for that email; the behavior for already-assigned principals is explicitly defined and implemented (either kept or revoked) and covered by a simple test scenario in acceptance checks/manual QA steps."
+        "Polling is disabled when the user is not on the Dashboard page (e.g., Login/Profile Setup/Approval Pending).",
+        "Polling is paused when the browser tab is not visible and resumes when visible again.",
+        "React Query refetch intervals are gated by the active module (e.g., Orders polling only runs when the Orders module is active), rather than using a single dashboard-wide boolean only.",
+        "The DashboardHome header’s auto-refresh UI no longer triggers a full component re-render every 10 seconds solely to update a timestamp (use query metadata such as dataUpdatedAt or update only when relevant queries refresh)."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Expose secondary admin allowlist management in the frontend for primary admins only (simple UI to view/add/remove secondary admin emails), and ensure secondary admins do not see or cannot access this UI.",
+      "text": "Ensure large/heavy UI modules and third-party libraries are not part of the initial bundle and are only downloaded when the user navigates to the relevant module or opens the relevant dialog.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "recent-messages"
+          "msg-1"
         ],
         "quotes": [
-          "please updated second admin"
+          "please fast loading aap  and speed open"
         ]
       },
       "acceptanceCriteria": [
-        "A primary admin can navigate to a settings/admin area and see a list of secondary admin emails, add a new email, and remove an existing email with confirmation.",
-        "Secondary admins do not see this management UI and cannot access it via direct navigation (route/module should be gated).",
-        "All user-facing text added/changed for this feature is in English.",
-        "Frontend uses existing React Query patterns (via frontend/src/hooks/useQueries.ts) to call the new backend APIs, including loading and error states."
+        "Dashboard modules remain code-split (lazy loaded) and do not get eagerly imported by shared components.",
+        "Barcode/invoice/report generation libraries (e.g., jsPDF/JsBarcode/QR-related code) are only loaded when the user opens the corresponding feature, not during initial app bootstrap.",
+        "Module loading fallbacks remain lightweight and do not depend on additional heavy libraries."
       ]
     },
     {
       "id": "REQ-4",
-      "text": "If the project already has deployed state that relied on a previous secondary-admin default email migration, add/adjust conditional upgrade migration logic so existing deployments retain the current secondary admin email allowlist and do not lose configured secondary admin emails during upgrade.",
+      "text": "Keep the backend bootstrap endpoint fast and minimal to support quick app open; avoid adding expensive computations or large data payloads to getBootstrapState.",
       "target": "backend",
       "source": {
         "messageIds": [
-          "recent-messages"
+          "msg-1"
         ],
         "quotes": [
-          "please updated second admin"
+          "please fast loading aap  and speed open"
         ]
       },
       "acceptanceCriteria": [
-        "On upgrade, the secondary admin email allowlist is preserved if it already exists in stable state.",
-        "If stable state lacks the allowlist (older deployments), it is initialized with the same default used today (SECONDARY_ADMIN_EMAIL = \"sahilgarments16@gmail.com\").",
-        "Upgrade does not trap due to missing fields/state related to secondary admin."
+        "getBootstrapState continues to return only: userProfile, isApproved, and isAdmin (no additional large lists or computed aggregates added).",
+        "All work inside getBootstrapState remains O(1) relative to stored dataset sizes (no iteration over products/orders/invoices/customers)."
       ]
     }
   ],
   "constraints": [
-    "Backend must remain a single-actor Motoko canister (all logic in backend/main.mo; add backend/migration.mo only if required by upgrade policy).",
-    "Do not edit any files under frontend/src/components/ui or other frontend immutablePaths listed in SYSTEM_CONTEXT; compose existing UI components instead.",
-    "Use English for any user-facing text."
+    "Do not edit files under frontend/src/hooks/useInternetIdentity.ts or .tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or any files under frontend/src/components/ui (these are immutable).",
+    "Backend must remain a single Motoko actor in backend/main.mo; only add backend/migration.mo changes if state schema upgrades are required."
   ],
   "nonGoals": [
-    "Implementing third-party authentication providers (only Internet Identity).",
-    "Adding new ERP business features unrelated to secondary admin (inventory/order/invoice workflows are out of scope for this request).",
-    "Real-time communication (WebSockets/push) for admin updates."
+    "Do not add new ERP features or change business logic (inventory, orders, invoices, roles) beyond performance-related behavior.",
+    "Do not introduce external databases, third-party auth providers, WebSockets, or new backend services."
   ],
   "imageRequirements": {
     "required": [],

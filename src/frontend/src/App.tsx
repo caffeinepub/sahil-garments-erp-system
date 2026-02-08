@@ -29,7 +29,7 @@ export default function App() {
     );
   }
 
-  // Not authenticated - show login
+  // Not authenticated - show login (no polling)
   if (!isAuthenticated) {
     return (
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -56,7 +56,7 @@ export default function App() {
   // Bootstrap loaded - route based on state
   const { userProfile, isApproved, isAdmin } = bootstrap;
 
-  // No profile - show profile setup
+  // No profile - show profile setup (no polling)
   if (!userProfile) {
     return (
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -70,7 +70,7 @@ export default function App() {
     );
   }
 
-  // Has profile but not approved and not admin - show approval pending
+  // Has profile but not approved and not admin - show approval pending (no polling)
   if (!isApproved && !isAdmin) {
     return (
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -85,11 +85,12 @@ export default function App() {
   }
 
   // Approved or admin - show dashboard with polling enabled
+  // Pass bootstrap data to Dashboard to avoid redundant queries
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <PollingProvider>
         <Suspense fallback={<AuthenticatedAppShell isLoading={true} />}>
-          <Dashboard />
+          <Dashboard initialUserProfile={userProfile} initialIsAdmin={isAdmin} />
         </Suspense>
       </PollingProvider>
       <Toaster />

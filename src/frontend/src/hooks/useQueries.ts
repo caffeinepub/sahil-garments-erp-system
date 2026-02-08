@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
 import type { Customer, OrderRecord, InventoryRecord, DataEntry, Notification, Stats, UserProfile, AppRole, InventoryLocation, UserApprovalInfo, Product, Invoice, Time, ProfitLossReport, AppBootstrapState } from '../backend';
-import { UserApprovalStatus } from '../backend';
+import { UserApprovalStatus, T as InvoiceStatus } from '../backend';
 import { Principal } from '@dfinity/principal';
 import { usePolling } from '../context/PollingContext';
 
@@ -195,8 +195,8 @@ export function useListSecondaryAdminEmails() {
       if (!actor) return [];
       return actor.listSecondaryAdminEmails();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? NOTIFICATION_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'secondaryAdmins',
+    refetchInterval: (polling.shouldPoll && polling.activeModule === 'secondaryAdmins') ? NOTIFICATION_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
     gcTime: 180000,
   });
@@ -261,9 +261,6 @@ export function useRequestApproval() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
     },
   });
 }
@@ -278,10 +275,10 @@ export function useListApprovals() {
       if (!actor) return [];
       return actor.listApprovals();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? NOTIFICATION_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'users',
+    refetchInterval: (polling.shouldPoll && polling.activeModule === 'users') ? NOTIFICATION_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
-    gcTime: 180000, // 3 minutes
+    gcTime: 180000,
   });
 }
 
@@ -292,20 +289,36 @@ export function useSetApproval() {
   return useMutation({
     mutationFn: async ({ user, status }: { user: Principal; status: UserApprovalStatus }) => {
       if (!actor) throw new Error('Actor not available');
-      // The backend expects ApprovalStatus type, but we're using UserApprovalStatus enum
-      // Convert enum to the format expected by backend
-      const backendStatus = status === UserApprovalStatus.approved ? 'approved' as any : 
-                           status === UserApprovalStatus.rejected ? 'rejected' as any : 
-                           'pending' as any;
+      // Convert UserApprovalStatus enum to backend format
+      let backendStatus: { approved: null } | { rejected: null } | { pending: null };
+      if (status === UserApprovalStatus.approved) {
+        backendStatus = { approved: null };
+      } else if (status === UserApprovalStatus.rejected) {
+        backendStatus = { rejected: null };
+      } else {
+        backendStatus = { pending: null };
+      }
       return actor.setApproval(user, backendStatus);
     },
     onSuccess: () => {
-      // Batch invalidate related queries for real-time sync
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['userAccounts'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+    },
+  });
+}
+
+export function useAssignAppRole() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ user, role }: { user: Principal; role: AppRole }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.assignAppRole(user, role);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userAccounts'] });
     },
   });
 }
@@ -321,9 +334,24 @@ export function useListCustomers() {
       if (!actor) return [];
       return actor.listCustomers();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? DASHBOARD_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'customers'),
+    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'customers')) ? DASHBOARD_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+export function useGetCustomer(customerId: bigint | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<Customer | null>({
+    queryKey: ['customer', customerId?.toString()],
+    queryFn: async () => {
+      if (!actor || customerId === null) return null;
+      return actor.getCustomer(customerId);
+    },
+    enabled: !!actor && !isFetching && customerId !== null,
+    staleTime: MEDIUM_STALE_TIME,
     gcTime: 180000,
   });
 }
@@ -333,13 +361,12 @@ export function useCreateCustomer() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; email: string; phone: string; address: string }) => {
+    mutationFn: async (customer: { name: string; email: string; phone: string; address: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.createCustomer(data.name, data.email, data.phone, data.address);
+      return actor.createCustomer(customer.name, customer.email, customer.phone, customer.address);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
   });
@@ -355,194 +382,9 @@ export function useDeleteCustomer() {
       return actor.deleteCustomer(customerId);
     },
     onSuccess: () => {
-      // Real-time sync: invalidate customers, stats, and dashboard
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
-  });
-}
-
-// Product Queries
-export function useListProducts() {
-  const { actor, isFetching } = useActor();
-  const polling = usePolling();
-
-  return useQuery<Product[]>({
-    queryKey: ['products'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listProducts();
-    },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? INVENTORY_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
-  });
-}
-
-export function useAddProduct() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      name: string;
-      description: string;
-      price: bigint;
-      stockLevel: bigint;
-      warehouse: string;
-      rack: string;
-      shelf: string;
-      size: string;
-      color: string;
-      barcode: string;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addProduct(
-        data.name,
-        data.description,
-        data.price,
-        data.stockLevel,
-        data.warehouse,
-        data.rack,
-        data.shelf,
-        data.size,
-        data.color,
-        data.barcode
-      );
-    },
-    onSuccess: () => {
-      // Real-time sync: invalidate inventory and dashboard
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-    },
-  });
-}
-
-export function useUpdateProduct() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      productId: bigint;
-      name: string;
-      description: string;
-      price: bigint;
-      stockLevel: bigint;
-      warehouse: string;
-      rack: string;
-      shelf: string;
-      size: string;
-      color: string;
-      barcode: string;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.updateProduct(
-        data.productId,
-        data.name,
-        data.description,
-        data.price,
-        data.stockLevel,
-        data.warehouse,
-        data.rack,
-        data.shelf,
-        data.size,
-        data.color,
-        data.barcode
-      );
-    },
-    onSuccess: () => {
-      // Real-time sync: invalidate inventory and dashboard
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-    },
-  });
-}
-
-// Inventory Queries
-export function useListInventory() {
-  const { actor, isFetching } = useActor();
-  const polling = usePolling();
-
-  return useQuery<InventoryRecord[]>({
-    queryKey: ['inventory'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listInventory();
-    },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? INVENTORY_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
-  });
-}
-
-export function useAddInventoryEntry() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { productId: bigint; quantity: bigint; batch: string; supplierId: bigint }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addInventoryEntry(data.productId, data.quantity, data.batch, data.supplierId);
-    },
-    onSuccess: () => {
-      // Real-time sync: batch invalidate related queries
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-    },
-  });
-}
-
-export function useDeleteAllInventory() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.deleteAllInventory();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-    },
-  });
-}
-
-export function useGetProductLocation() {
-  const { actor } = useActor();
-
-  return useMutation({
-    mutationFn: async (productId: bigint) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getProductLocation(productId);
-    },
-  });
-}
-
-export function useSetProductLocation() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ productId, location }: { productId: bigint; location: InventoryLocation }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.setProductLocation(productId, location);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
 }
@@ -558,9 +400,24 @@ export function useListOrders() {
       if (!actor) return [];
       return actor.listOrders();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? ORDER_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'orders' || polling.activeModule === 'analytics'),
+    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'orders' || polling.activeModule === 'analytics')) ? ORDER_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+export function useGetOrder(orderId: bigint | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<OrderRecord | null>({
+    queryKey: ['order', orderId?.toString()],
+    queryFn: async () => {
+      if (!actor || orderId === null) return null;
+      return actor.getOrder(orderId);
+    },
+    enabled: !!actor && !isFetching && orderId !== null,
+    staleTime: MEDIUM_STALE_TIME,
     gcTime: 180000,
   });
 }
@@ -570,19 +427,13 @@ export function useCreateOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { customerId: bigint; productId: bigint; quantity: bigint; status: string; totalPrice: bigint }) => {
+    mutationFn: async (order: { customerId: bigint; productId: bigint; quantity: bigint; status: string; totalPrice: bigint }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.createOrder(data.customerId, data.productId, data.quantity, data.status, data.totalPrice);
+      return actor.createOrder(order.customerId, order.productId, order.quantity, order.status, order.totalPrice);
     },
     onSuccess: () => {
-      // Real-time sync: batch invalidate orders, inventory, invoices, and dashboard
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-      queryClient.invalidateQueries({ queryKey: ['profitLoss'] });
     },
   });
 }
@@ -598,10 +449,154 @@ export function useDeleteAllOrders() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-      queryClient.invalidateQueries({ queryKey: ['profitLoss'] });
     },
+  });
+}
+
+// Product/Inventory Queries
+export function useListProducts() {
+  const { actor, isFetching } = useActor();
+  const polling = usePolling();
+
+  return useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listProducts();
+    },
+    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'inventory' || polling.activeModule === 'barcode' || polling.activeModule === 'invoice' || polling.activeModule === 'reports'),
+    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'inventory' || polling.activeModule === 'barcode' || polling.activeModule === 'invoice' || polling.activeModule === 'reports')) ? INVENTORY_REFRESH_INTERVAL : false,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+export function useGetProduct(productId: bigint | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<Product | null>({
+    queryKey: ['product', productId?.toString()],
+    queryFn: async () => {
+      if (!actor || productId === null) return null;
+      return actor.getProduct(productId);
+    },
+    enabled: !!actor && !isFetching && productId !== null,
+    staleTime: MEDIUM_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+export function useAddProduct() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (product: {
+      name: string;
+      description: string;
+      price: bigint;
+      stockLevel: bigint;
+      warehouse: string;
+      rack: string;
+      shelf: string;
+      size: string;
+      color: string;
+      barcode: string;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.addProduct(
+        product.name,
+        product.description,
+        product.price,
+        product.stockLevel,
+        product.warehouse,
+        product.rack,
+        product.shelf,
+        product.size,
+        product.color,
+        product.barcode
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+    },
+  });
+}
+
+export function useUpdateProduct() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (product: {
+      productId: bigint;
+      name: string;
+      description: string;
+      price: bigint;
+      stockLevel: bigint;
+      warehouse: string;
+      rack: string;
+      shelf: string;
+      size: string;
+      color: string;
+      barcode: string;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.updateProduct(
+        product.productId,
+        product.name,
+        product.description,
+        product.price,
+        product.stockLevel,
+        product.warehouse,
+        product.rack,
+        product.shelf,
+        product.size,
+        product.color,
+        product.barcode
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+    },
+  });
+}
+
+export function useDeleteAllInventory() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.deleteAllInventory();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+    },
+  });
+}
+
+// Inventory Records
+export function useListInventory() {
+  const { actor, isFetching } = useActor();
+  const polling = usePolling();
+
+  return useQuery<InventoryRecord[]>({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listInventory();
+    },
+    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'inventory' || polling.activeModule === 'analytics' || polling.activeModule === 'reports'),
+    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'inventory' || polling.activeModule === 'analytics' || polling.activeModule === 'reports')) ? INVENTORY_REFRESH_INTERVAL : false,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 180000,
   });
 }
 
@@ -616,9 +611,24 @@ export function useListInvoices() {
       if (!actor) return [];
       return actor.listInvoices();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? INVOICE_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'invoice' || polling.activeModule === 'invoiceHistory'),
+    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'invoice' || polling.activeModule === 'invoiceHistory')) ? INVOICE_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+export function useGetInvoice(invoiceId: bigint | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<Invoice | null>({
+    queryKey: ['invoice', invoiceId?.toString()],
+    queryFn: async () => {
+      if (!actor || invoiceId === null) return null;
+      return actor.getInvoice(invoiceId);
+    },
+    enabled: !!actor && !isFetching && invoiceId !== null,
+    staleTime: MEDIUM_STALE_TIME,
     gcTime: 180000,
   });
 }
@@ -628,31 +638,29 @@ export function useCreateInvoice() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: {
+    mutationFn: async (invoice: {
       customerId: bigint;
       productId: bigint;
       quantity: bigint;
       price: bigint;
       tax: bigint;
       total: bigint;
-      status: any;
+      status: InvoiceStatus;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.createInvoice(
-        data.customerId,
-        data.productId,
-        data.quantity,
-        data.price,
-        data.tax,
-        data.total,
-        data.status
+        invoice.customerId,
+        invoice.productId,
+        invoice.quantity,
+        invoice.price,
+        invoice.tax,
+        invoice.total,
+        invoice.status
       );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-      queryClient.invalidateQueries({ queryKey: ['profitLoss'] });
     },
   });
 }
@@ -669,7 +677,6 @@ export function useStockAdjustInvoice() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
   });
@@ -686,8 +693,8 @@ export function useListNotifications() {
       if (!actor) return [];
       return actor.listNotifications();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? NOTIFICATION_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'notifications'),
+    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'notifications')) ? NOTIFICATION_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
     gcTime: 180000,
   });
@@ -704,87 +711,31 @@ export function useMarkNotificationAsRead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
   });
 }
 
-// Stats Queries
-export function useGetStats() {
+// Dashboard Metrics (alias for getStats)
+export function useDashboardMetrics() {
   const { actor, isFetching } = useActor();
   const polling = usePolling();
 
   return useQuery<Stats>({
-    queryKey: ['stats'],
+    queryKey: ['dashboardMetrics'],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
       return actor.getStats();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? DASHBOARD_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'dashboard',
+    refetchInterval: (polling.shouldPoll && polling.activeModule === 'dashboard') ? DASHBOARD_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
     gcTime: 180000,
   });
 }
 
-// Dashboard Metrics (computed from multiple sources)
-export function useDashboardMetrics() {
-  const { data: stats } = useGetStats();
-  const { data: products = [] } = useListProducts();
-  const { data: invoices = [] } = useListInvoices();
-  const { data: orders = [] } = useListOrders();
-  const { data: notifications = [] } = useListNotifications();
-  const { data: approvals = [] } = useListApprovals();
-
-  return useQuery({
-    queryKey: ['dashboardMetrics', stats, products, invoices, orders, notifications, approvals],
-    queryFn: async () => {
-      const lowStockProducts = products.filter(p => Number(p.stockLevel) < 10);
-      const unreadNotifications = notifications.filter(n => !n.isRead);
-      const pendingApprovals = approvals.filter(a => a.status === 'pending' as any);
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayTimestamp = BigInt(today.getTime() * 1000000);
-      
-      const todayRequests = approvals.filter(a => {
-        // Approximation: count all pending as today's requests
-        return a.status === 'pending' as any;
-      }).length;
-
-      const recentOrders = orders.filter(o => {
-        const orderDate = new Date(Number(o.created) / 1000000);
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        return orderDate >= sevenDaysAgo;
-      }).length;
-
-      const pendingInvoices = invoices.filter(i => i.status === 'sent' as any || i.status === 'draft' as any).length;
-      const paidInvoices = invoices.filter(i => i.status === 'paid' as any).length;
-      const unpaidInvoices = invoices.filter(i => i.status === 'sent' as any).length;
-      const overdueInvoices = invoices.filter(i => i.status === 'overdue' as any).length;
-
-      return {
-        totalUsers: pendingApprovals.length + approvals.filter(a => a.status === 'approved' as any).length,
-        totalOrders: stats?.totalOrders || BigInt(0),
-        totalInventory: stats?.totalInventory || BigInt(0),
-        totalRevenue: stats?.totalRevenue || BigInt(0),
-        lowStockAlerts: lowStockProducts.length,
-        unreadNotifications: unreadNotifications.length,
-        pendingApprovals: pendingApprovals.length,
-        todayRequests,
-        recentOrders,
-        pendingInvoices,
-        paymentStatus: {
-          paid: paidInvoices,
-          unpaid: unpaidInvoices,
-          overdue: overdueInvoices,
-        },
-      };
-    },
-    enabled: !!stats,
-    staleTime: SHORT_STALE_TIME,
-  });
-}
+// Alias for backward compatibility
+export const useGetStats = useDashboardMetrics;
 
 // Data Entry Queries
 export function useListDataEntries() {
@@ -797,8 +748,8 @@ export function useListDataEntries() {
       if (!actor) return [];
       return actor.listDataEntries();
     },
-    enabled: !!actor && !isFetching && polling.isDashboardActive,
-    refetchInterval: polling.isDashboardActive ? DASHBOARD_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'analytics' || polling.activeModule === 'reports'),
+    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'analytics' || polling.activeModule === 'reports')) ? DASHBOARD_REFRESH_INTERVAL : false,
     staleTime: SHORT_STALE_TIME,
     gcTime: 180000,
   });
@@ -807,15 +758,35 @@ export function useListDataEntries() {
 // Profit & Loss Report
 export function useGetProfitLossReport(startDate: Time, endDate: Time) {
   const { actor, isFetching } = useActor();
+  const polling = usePolling();
 
   return useQuery<ProfitLossReport>({
-    queryKey: ['profitLoss', startDate.toString(), endDate.toString()],
+    queryKey: ['profitLossReport', startDate.toString(), endDate.toString()],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
       return actor.getProfitLossReport(startDate, endDate);
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'reports',
+    refetchInterval: (polling.shouldPoll && polling.activeModule === 'reports') ? DASHBOARD_REFRESH_INTERVAL : false,
     staleTime: MEDIUM_STALE_TIME,
+    gcTime: 180000,
+  });
+}
+
+// User Account Queries
+export function useGetAllUserAccounts() {
+  const { actor, isFetching } = useActor();
+  const polling = usePolling();
+
+  return useQuery({
+    queryKey: ['userAccounts'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllUserAccounts();
+    },
+    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'users',
+    refetchInterval: (polling.shouldPoll && polling.activeModule === 'users') ? NOTIFICATION_REFRESH_INTERVAL : false,
+    staleTime: SHORT_STALE_TIME,
     gcTime: 180000,
   });
 }

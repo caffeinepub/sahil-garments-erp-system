@@ -14,9 +14,9 @@ import AccessControl "authorization/access-control";
 import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   include MixinStorage();
 
@@ -369,6 +369,11 @@ actor {
 
   // Return AppBootstrapState batched endpoint for the frontend
   public query ({ caller }) func getBootstrapState() : async AppBootstrapState {
+    // Require authentication for bootstrap state
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Authentication required");
+    };
+
     let userProfile = userProfiles.get(caller);
     let isApproved = if (AccessControl.isAdmin(accessControlState, caller)) {
       true;
@@ -920,9 +925,12 @@ actor {
     iter.toArray();
   };
 
-  // RESTRICTED: Only primary admins can delete customers (excludes secondary admin)
+  // RESTRICTED: Only admins can delete customers (both primary and secondary admins)
   public shared ({ caller }) func deleteCustomer(customerId : Nat) : async Bool {
-    requirePrimaryAdmin(caller);
+    requireApprovedUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can delete customers");
+    };
 
     switch (customers.get(customerId)) {
       case (null) {

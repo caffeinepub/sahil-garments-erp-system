@@ -1,37 +1,94 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Primary-admin-only secondary admin allowlist management UI",
+  "title": "Frontend performance optimizations for faster app open and reduced polling work",
   "requirements": [
     {
-      "id": "REQ-3",
-      "summary": "Add a primary-admin-only dashboard area to view/add/remove secondary admin allowlist emails using existing React Query patterns and backend methods, with strict UI gating for secondary admins.",
+      "id": "REQ-1",
+      "summary": "Minimize initial authenticated render work by showing an immediate app shell and deferring all module data fetching until Dashboard mount and module activation, without changing auth/approval flows.",
       "acceptanceCriteria": [
-        "A primary admin can navigate to a settings/admin area and see a list of secondary admin emails, add a new email, and remove an existing email with confirmation.",
-        "Secondary admins do not see this management UI and cannot access it via direct navigation (route/module should be gated).",
-        "All user-facing text added/changed for this feature is in English.",
-        "Frontend uses existing React Query patterns (via frontend/src/hooks/useQueries.ts) to call the new backend APIs, including loading and error states."
+        "When the user is authenticated, the UI shows an immediate app shell (header/sidebar/skeletons) without waiting for non-essential data beyond the existing getBootstrapState call.",
+        "No module-specific data queries (orders/inventory/invoices/analytics/reports/etc.) start fetching until the Dashboard page is mounted and a module that needs them is active.",
+        "The Login/Profile Setup/Approval Pending screens continue to load via lazy loading (no regression from current Suspense behavior)."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Add React Query hooks to integrate with backend capabilities for secondary admin allowlist management: listSecondaryAdminEmails (query), addSecondaryAdminEmail (mutation), removeSecondaryAdminEmail (mutation), plus a role-check hook for primary-admin gating using the existing backend capability isSuperAdmin(). Ensure hooks provide loading/error states and invalidate/refetch the allowlist on mutations. Use the authorization component’s role-based access control patterns for gating decisions; verify the component's usage instructions before implementing."
-        },
-        {
-          "path": "frontend/src/components/modules/SecondaryAdminAllowlistModule.tsx",
-          "operation": "create",
-          "description": "Create a new dashboard module UI for primary admins to manage the secondary admin email allowlist: display current emails, add email form with basic validation, and remove email action with confirmation dialog. Show clear loading and error states from React Query, and ensure all user-facing text is English. Use existing shadcn/ui components already present in the project (do not modify immutable ui components). Use the authorization component’s guidance for handling authorization errors gracefully; verify the component's usage instructions before implementing."
+          "description": "Keep the current lazy-loading auth/approval routing, and pass the already-fetched bootstrap-derived userProfile/isAdmin into the Dashboard component so Dashboard can render immediately without triggering additional non-essential queries on first mount."
         },
         {
           "path": "frontend/src/pages/Dashboard.tsx",
           "operation": "modify",
-          "description": "Wire the new SecondaryAdminAllowlistModule into the dashboard module switch (e.g., a new module id under an admin/settings area), and add a primary-admin-only gate using the new isSuperAdmin hook. If a non-primary admin somehow navigates to this module id, render an in-module access denied state (or fallback to dashboard) to prevent access. Use the authorization component’s role-based access checks for gating; verify the component's usage instructions before implementing."
+          "description": "Accept initial user context (e.g., bootstrap userProfile/isAdmin) via props and avoid initiating redundant user/profile/admin queries on mount; ensure polling is enabled only while Dashboard is mounted (enable on mount, disable on unmount cleanup)."
         },
         {
-          "path": "frontend/src/components/Sidebar.tsx",
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a new sidebar navigation item (e.g., \"Admin Settings\" / \"Secondary Admins\") that is only visible for primary admins (isSuperAdmin). Ensure secondary admins do not see the entry. Use the authorization component’s role-based access control patterns for conditional navigation; verify the component's usage instructions before implementing."
+          "description": "Ensure all module-specific React Query hooks are disabled until Dashboard is active and the relevant module is active (gate query enabled/refetchInterval with PollingContext activeModule rather than only a dashboard-wide boolean)."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Reduce CPU/network usage by pausing polling off-Dashboard, pausing when tab is hidden, gating intervals per active module, and preventing DashboardHome auto-refresh UI from forcing full re-renders.",
+      "acceptanceCriteria": [
+        "Polling is disabled when the user is not on the Dashboard page (e.g., Login/Profile Setup/Approval Pending).",
+        "Polling is paused when the browser tab is not visible and resumes when visible again.",
+        "React Query refetch intervals are gated by the active module (e.g., Orders polling only runs when the Orders module is active), rather than using a single dashboard-wide boolean only.",
+        "The DashboardHome header’s auto-refresh UI no longer triggers a full component re-render every 10 seconds solely to update a timestamp (use query metadata such as dataUpdatedAt or update only when relevant queries refresh)."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/context/PollingContext.tsx",
+          "operation": "modify",
+          "description": "Extend polling state to include tab visibility awareness (pause/resume when document visibility changes) and provide a single derived flag/helper for whether polling should run based on Dashboard activity + tab visibility + activeModule."
+        },
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Ensure PollingContext is correctly driven by navigation: set activeModule whenever the module changes, enable polling on mount, and disable polling in an effect cleanup when Dashboard unmounts so polling is off for Login/Profile Setup/Approval Pending."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Update refetchInterval/enabled logic for all polling queries to: (1) stop when not on Dashboard, (2) stop when tab is hidden, and (3) only run for the currently active module (dashboard vs orders vs inventory vs invoices vs analytics vs reports vs users vs notifications, etc.)."
+        },
+        {
+          "path": "frontend/src/components/modules/DashboardHome.tsx",
+          "operation": "modify",
+          "description": "Remove the 10-second setInterval-based lastUpdate state that forces a full component re-render; instead display a refresh indicator derived from React Query metadata (e.g., dataUpdatedAt from key dashboard queries) or update only when the relevant queries actually refresh."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Keep heavy UI modules and third-party generation libraries out of the initial bundle by enforcing lazy imports and on-demand loading for barcode/invoice/report generation features.",
+      "acceptanceCriteria": [
+        "Dashboard modules remain code-split (lazy loaded) and do not get eagerly imported by shared components.",
+        "Barcode/invoice/report generation libraries (e.g., jsPDF/JsBarcode/QR-related code) are only loaded when the user opens the corresponding feature, not during initial app bootstrap.",
+        "Module loading fallbacks remain lightweight and do not depend on additional heavy libraries."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Audit and adjust imports to ensure Dashboard modules remain lazily loaded and are not re-exported or imported by shared layout components in a way that would cause eager bundling; keep module fallback UI lightweight."
+        },
+        {
+          "path": "frontend/src/components/InvoiceGenerator.tsx",
+          "operation": "modify",
+          "description": "Ensure third-party document generation code remains strictly on-demand (only load jsPDF when the invoice generation action runs or when the generator is explicitly opened), and avoid any eager preloading that could occur during app bootstrap."
+        },
+        {
+          "path": "frontend/src/components/modules/InventoryReportModule.tsx",
+          "operation": "modify",
+          "description": "Keep JsBarcode/jsPDF loading strictly gated to user-driven report generation flows and ensure no library-loading side effects occur until the Inventory Report module is mounted and the feature is activated."
+        },
+        {
+          "path": "frontend/src/components/BarcodeGenerator.tsx",
+          "operation": "modify",
+          "description": "Confirm barcode/QR generation dependencies remain dynamically loaded only when the barcode generator dialog/feature is opened, and avoid moving any heavy imports into top-level module scope."
         }
       ]
     }

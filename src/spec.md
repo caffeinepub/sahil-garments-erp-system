@@ -1,12 +1,14 @@
 # Specification
 
 ## Summary
-**Goal:** Make the “secondary admin” role deterministic and manageable: automatically recognize designated secondary admins after profile setup, keep them restricted from primary-admin-only actions, and let primary admins manage the secondary-admin email allowlist (backend + gated frontend UI) with upgrade-safe persistence.
+**Goal:** Improve app perceived and actual performance so it opens faster and becomes usable quickly after launch/refresh, without changing existing auth/approval behavior.
 
 **Planned changes:**
-- Update backend secondary-admin handling so users whose profile email is in the secondary-admin email allowlist are automatically added to the backend secondary-admin principals set after profile save/setup, and are treated as admin for normal admin checks while still failing primary-admin-only guards.
-- Add backend primary-admin-only APIs to list/add/remove secondary-admin allowlist emails, with changes taking effect for future profile saves/logins, and explicitly define the behavior for already-assigned secondary-admin principals when an email is removed.
-- Add a primary-admin-only frontend settings/admin UI to view/add/remove secondary-admin emails (with confirmation), using existing React Query patterns and showing loading/error states; ensure secondary admins cannot see or access this UI via routing.
-- Add/adjust upgrade migration logic so the secondary-admin allowlist is preserved when already present in stable state; otherwise initialize it with the current default email, and avoid upgrade traps from missing legacy fields/state.
+- Show an immediate authenticated app shell (header/sidebar/loading skeletons) while only waiting on the existing `getBootstrapState` call; defer all non-essential/module data work.
+- Ensure module-specific data fetching (orders/inventory/invoices/analytics/reports/etc.) does not start until the Dashboard is mounted and the relevant module is active.
+- Optimize polling/refetch behavior: disable polling off-Dashboard, pause when the tab is hidden, and gate refetch intervals by active module.
+- Reduce unnecessary Dashboard re-renders caused by auto-refresh timestamp updates by using query metadata (e.g., `dataUpdatedAt`) or updating only when relevant queries refresh.
+- Keep heavy UI modules and third-party generation libraries (PDF/barcode/QR/report) out of the initial bundle; load them only when the corresponding module/dialog is opened.
+- Keep `getBootstrapState` backend response minimal (userProfile, isApproved, isAdmin) and ensure it stays O(1) with no expensive computations.
 
-**User-visible outcome:** Primary admins can manage which email addresses qualify as “secondary admin” in a settings/admin screen, and designated secondary admins automatically gain admin access for standard admin areas after saving their profile, while remaining blocked from primary-admin-only actions like user management.
+**User-visible outcome:** The app opens faster and shows a usable UI shell sooner; data loads on-demand as users enter modules, and background polling is reduced/paused when not needed, while login/profile setup/approval screens continue to behave as before.

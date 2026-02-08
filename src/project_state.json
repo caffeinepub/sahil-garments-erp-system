@@ -1,14 +1,30 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "ERP system with inventory stock level automation and order-to-invoice workflow, including alerts, linking, and dashboard reporting; also needs secondary admin setup updates.",
+  "summary": "New project",
   "architectural_notes": [],
   "known_issues": [],
   "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-expose-secondary-admin-allowlist-management-in-the-frontend-for-primary-admins-only-simple-ui-to-view-add-remove-secondary-admin-emails-and-ensure-secondary-admins-do-not-see-or-cannot-access-this-ui",
-      "title": "Expose secondary admin allowlist management in the frontend for primary admins only (simple UI to view/add/remove secondary admin emails), and ensure secondary admins do not see or cannot access this UI.",
+      "id": "feature-reduce-initial-page-load-work-so-the-app-becomes-usable-as-quickly-as-possible-after-launch-both-on-first-open-and-on-refresh-while-preserving-existing-authentication-approval-flows",
+      "title": "Reduce initial page-load work so the app becomes usable as quickly as possible after launch (both on first open and on refresh), while preserving existing authentication/approval flows.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-optimize-dashboard-polling-and-re-render-behavior-to-reduce-cpu-network-usage-during-normal-use-and-especially-on-app-open-including-pausing-background-polling-when-not-needed",
+      "title": "Optimize dashboard polling and re-render behavior to reduce CPU/network usage during normal use and especially on app open, including pausing background polling when not needed.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-large-heavy-ui-modules-and-third-party-libraries-are-not-part-of-the-initial-bundle-and-are-only-downloaded-when-the-user-navigates-to-the-relevant-module-or-opens-the-relevant-dialog",
+      "title": "Ensure large/heavy UI modules and third-party libraries are not part of the initial bundle and are only downloaded when the user navigates to the relevant module or opens the relevant dialog.",
       "reqIds": [
         "REQ-3"
       ],
@@ -18,67 +34,20 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Update/enable the secondary (second) admin setup (roles/permissions/access)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Auto-reduce inventory stock on sales order confirmation and/or invoice creation with real-time stock updates and insufficient-stock alerts",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Auto-generate invoice from confirmed order (order → invoice merge/auto-fetch customer, items, qty, price; avoid manual re-entry)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Stock level alert system with configurable minimum stock; out-of-stock blocking/warnings and low-stock purchase reminders",
+      "summary": "Improve app performance: faster loading and quicker app launch/open time",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-5",
-      "summary": "Order ↔ invoice reference linking and status tracking (paid/pending, invoice status visible from order history)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-6",
-      "summary": "Inventory/Order/Invoice dashboard (total stock summary, low stock list, pending orders, generated invoice count)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-7",
-      "summary": "Update the backend secondary-admin model so the designated secondary admin (by email) is automatically recognized as an admin principal after they complete profile setup, while still being restricted from primary-admin-only actions (e.g., user approvals / user management).",
-      "reqIds": [
-        "REQ-1"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-8",
-      "summary": "Add backend management APIs for primary admins to update the secondary admin email allowlist (add/remove/list) without changing code constants, and ensure changes take effect for new logins/profile-saves.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-10",
-      "summary": "If the project already has deployed state that relied on a previous secondary-admin default email migration, add/adjust conditional upgrade migration logic so existing deployments retain the current secondary admin email allowlist and do not lose configured secondary admin emails during upgrade.",
+      "summary": "Keep the backend bootstrap endpoint fast and minimal to support quick app open; avoid adding expensive computations or large data payloads to getBootstrapState.",
       "reqIds": [
         "REQ-4"
       ],
       "status": "pending"
     }
   ],
-  "gameProjectType": "none",
-  "projectName": "Sahil Garments ERP",
+  "projectName": "Improve app performance for faster loading and quicker open time",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

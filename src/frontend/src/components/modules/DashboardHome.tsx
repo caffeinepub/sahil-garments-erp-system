@@ -1,32 +1,61 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useDashboardMetrics, useListOrders, useListNotifications, useListCustomers } from '../../hooks/useQueries';
-import { Users, Package, ShoppingCart, DollarSign, TrendingUp, AlertCircle, Clock, CheckCircle2, XCircle, Bell, Activity, RefreshCw, PackageCheck, AlertTriangle, Receipt } from 'lucide-react';
+import { useDashboardMetrics, useListOrders, useListNotifications, useListCustomers, useListProducts, useListInvoices } from '../../hooks/useQueries';
+import { Users, Package, ShoppingCart, DollarSign, TrendingUp, AlertCircle, Clock, CheckCircle2, XCircle, Bell, PackageCheck, AlertTriangle } from 'lucide-react';
 import { UserProfile } from '../../backend';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 interface DashboardHomeProps {
   userProfile: UserProfile;
 }
 
 export default function DashboardHome({ userProfile }: DashboardHomeProps) {
-  const { data: metrics, isLoading: metricsLoading } = useDashboardMetrics();
+  const { data: metrics, isLoading: metricsLoading, dataUpdatedAt } = useDashboardMetrics();
   const { data: orders = [], isLoading: ordersLoading } = useListOrders();
   const { data: notifications = [] } = useListNotifications();
   const { data: customers = [] } = useListCustomers();
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const { data: products = [] } = useListProducts();
+  const { data: invoices = [] } = useListInvoices();
 
   const isAdmin = userProfile.appRole === 'admin';
   const canAccessFinancial = isAdmin || userProfile.appRole === 'accountant';
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastUpdate(new Date());
-    }, 10000); // Update every 10 seconds
-    return () => clearInterval(interval);
-  }, []);
+  // Use query metadata for last update time instead of setInterval
+  const lastUpdateTime = useMemo(() => {
+    if (!dataUpdatedAt) return new Date();
+    return new Date(dataUpdatedAt);
+  }, [dataUpdatedAt]);
+
+  // Compute extended metrics from data
+  const extendedMetrics = useMemo(() => {
+    const unreadNotifications = notifications.filter(n => !n.isRead).length;
+    const lowStockAlerts = products.filter(p => Number(p.stockLevel) < 10).length;
+    const recentOrders = orders.filter(o => {
+      const orderDate = new Date(Number(o.created) / 1000000);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return orderDate >= sevenDaysAgo;
+    }).length;
+
+    const pendingInvoices = invoices.filter(i => i.status === 'draft' || i.status === 'sent').length;
+    const paidInvoices = invoices.filter(i => i.status === 'paid').length;
+    const unpaidInvoices = invoices.filter(i => i.status === 'sent').length;
+    const overdueInvoices = invoices.filter(i => i.status === 'overdue').length;
+
+    return {
+      unreadNotifications,
+      lowStockAlerts,
+      recentOrders,
+      pendingInvoices,
+      paymentStatus: {
+        paid: paidInvoices,
+        unpaid: unpaidInvoices,
+        overdue: overdueInvoices,
+      },
+    };
+  }, [notifications, products, orders, invoices]);
 
   const recentOrders = orders.slice(0, 5);
   const recentNotifications = notifications.slice(0, 5);
@@ -80,8 +109,8 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
           <p className="text-muted-foreground mt-1">Here's what's happening with your business today.</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <RefreshCw className="h-4 w-4 animate-spin text-green-600" />
-          <span>Auto-refresh: {formatTime(lastUpdate)}</span>
+          <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
+          <span>Live: {formatTime(lastUpdateTime)}</span>
         </div>
       </div>
 
@@ -111,7 +140,7 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                     <Users className="h-5 w-5 text-blue-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold animate-fade-in">{metrics?.totalUsers || 0}</div>
+                    <div className="text-3xl font-bold animate-fade-in">{customers.length}</div>
                     <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                       <TrendingUp className="h-3 w-3" />
                       Active user base
@@ -125,13 +154,8 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                     <Clock className="h-5 w-5 text-amber-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold animate-fade-in">{metrics?.todayRequests || 0}</div>
+                    <div className="text-3xl font-bold animate-fade-in">0</div>
                     <p className="text-xs text-muted-foreground mt-1">Pending approval requests</p>
-                    {(metrics?.todayRequests || 0) > 0 && (
-                      <Badge variant="destructive" className="mt-2 text-xs animate-pulse-slow">
-                        Action required
-                      </Badge>
-                    )}
                   </CardContent>
                 </Card>
 
@@ -141,7 +165,7 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                     <ShoppingCart className="h-5 w-5 text-purple-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold animate-fade-in">{metrics?.pendingInvoices || 0}</div>
+                    <div className="text-3xl font-bold animate-fade-in">{extendedMetrics.pendingInvoices}</div>
                     <p className="text-xs text-muted-foreground mt-1">Requires processing</p>
                   </CardContent>
                 </Card>
@@ -158,21 +182,21 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                           <CheckCircle2 className="h-3 w-3" />
                           Paid
                         </span>
-                        <span className="font-semibold">{metrics?.paymentStatus.paid || 0}</span>
+                        <span className="font-semibold">{extendedMetrics.paymentStatus.paid}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-1 text-amber-600">
                           <Clock className="h-3 w-3" />
                           Unpaid
                         </span>
-                        <span className="font-semibold">{metrics?.paymentStatus.unpaid || 0}</span>
+                        <span className="font-semibold">{extendedMetrics.paymentStatus.unpaid}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-1 text-red-600">
                           <XCircle className="h-3 w-3" />
                           Overdue
                         </span>
-                        <span className="font-semibold">{metrics?.paymentStatus.overdue || 0}</span>
+                        <span className="font-semibold">{extendedMetrics.paymentStatus.overdue}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -186,7 +210,7 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                     <PackageCheck className="h-5 w-5 text-indigo-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold animate-fade-in">{metrics?.totalInventory || 0}</div>
+                    <div className="text-3xl font-bold animate-fade-in">{Number(metrics?.totalInventory || 0)}</div>
                     <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                       <Package className="h-3 w-3" />
                       Stock entries
@@ -200,7 +224,7 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                     <ShoppingCart className="h-5 w-5 text-cyan-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold animate-fade-in">{metrics?.recentOrders || 0}</div>
+                    <div className="text-3xl font-bold animate-fade-in">{extendedMetrics.recentOrders}</div>
                     <p className="text-xs text-muted-foreground mt-1">Last 7 days</p>
                   </CardContent>
                 </Card>
@@ -211,9 +235,9 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                     <AlertTriangle className="h-5 w-5 text-orange-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold animate-fade-in">{metrics?.lowStockAlerts || 0}</div>
+                    <div className="text-3xl font-bold animate-fade-in">{extendedMetrics.lowStockAlerts}</div>
                     <p className="text-xs text-muted-foreground mt-1">Below 10 units</p>
-                    {(metrics?.lowStockAlerts || 0) > 0 && (
+                    {extendedMetrics.lowStockAlerts > 0 && (
                       <Badge variant="destructive" className="mt-2 text-xs animate-pulse-slow">
                         Attention needed
                       </Badge>
@@ -244,7 +268,7 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                   <ShoppingCart className="h-5 w-5 text-green-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold animate-fade-in">{metrics?.totalOrders || 0}</div>
+                  <div className="text-3xl font-bold animate-fade-in">{Number(metrics?.totalOrders || 0)}</div>
                   <p className="text-xs text-muted-foreground mt-1">All time orders</p>
                 </CardContent>
               </Card>
@@ -255,7 +279,7 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                   <Package className="h-5 w-5 text-purple-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold animate-fade-in">{metrics?.totalInventory || 0}</div>
+                  <div className="text-3xl font-bold animate-fade-in">{Number(metrics?.totalInventory || 0)}</div>
                   <p className="text-xs text-muted-foreground mt-1">Stock entries</p>
                 </CardContent>
               </Card>
@@ -289,10 +313,10 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
                   <Bell className="h-5 w-5" />
                   Notifications
                 </span>
-                {(metrics?.unreadNotifications || 0) > 0 && (
+                {extendedMetrics.unreadNotifications > 0 && (
                   <Badge variant="destructive" className="gap-1 animate-pulse-slow">
                     <AlertCircle className="h-3 w-3" />
-                    {metrics?.unreadNotifications} unread
+                    {extendedMetrics.unreadNotifications} unread
                   </Badge>
                 )}
               </CardTitle>
@@ -338,129 +362,82 @@ export default function DashboardHome({ userProfile }: DashboardHomeProps) {
           <Card className="hover:shadow-lg transition-all duration-300">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Recent Activity
+                <ShoppingCart className="h-5 w-5" />
+                Order Status Overview
               </CardTitle>
             </CardHeader>
             <CardContent>
               {ordersLoading ? (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
+                <div className="flex items-center justify-center h-64">
+                  <Skeleton className="h-full w-full" />
                 </div>
-              ) : recentOrders.length === 0 ? (
+              ) : orders.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>No orders yet</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-80 overflow-y-auto">
-                  {recentOrders.map((order) => (
-                    <div
-                      key={Number(order.id)}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-all duration-200 animate-fade-in"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Order #{Number(order.id)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Customer ID: {Number(order.customerId)} • Quantity: {Number(order.quantity)}
-                        </p>
-                      </div>
-                      <div className="text-right flex items-center gap-2">
-                        {getStatusIcon(order.status)}
-                        <div>
-                          <Badge
-                            variant={
-                              order.status === 'fulfilled'
-                                ? 'default'
-                                : order.status === 'cancelled'
-                                  ? 'destructive'
-                                  : 'secondary'
-                            }
-                            className="capitalize"
-                          >
-                            {order.status}
-                          </Badge>
-                          {canAccessFinancial && (
-                            <p className="text-xs font-medium mt-1">{formatCurrency(order.totalPrice)}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="name" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
         </div>
       )}
 
-      <Card className="hover:shadow-lg transition-all duration-300">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart className="h-5 w-5" />
-            Orders by Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {ordersLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]} animationDuration={800}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800 transition-all duration-200 hover:shadow-md">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse-slow" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Pending</p>
-                    <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{ordersByStatus.pending}</p>
+      {isAdmin && recentOrders.length > 0 && (
+        <Card className="hover:shadow-lg transition-all duration-300">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Recent Orders
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {recentOrders.map((order) => (
+                <div
+                  key={Number(order.id)}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {getStatusIcon(order.status)}
+                    <div>
+                      <p className="font-medium text-sm">Order #{Number(order.id)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Customer ID: {Number(order.customerId)} • Product ID: {Number(order.productId)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-sm">{formatCurrency(order.totalPrice)}</p>
+                    <Badge variant={order.status === 'fulfilled' ? 'default' : 'secondary'} className="text-xs mt-1">
+                      {order.status}
+                    </Badge>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 transition-all duration-200 hover:shadow-md">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse-slow" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Processing</p>
-                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{ordersByStatus.processing}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 transition-all duration-200 hover:shadow-md">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Fulfilled</p>
-                    <p className="text-lg font-bold text-green-600 dark:text-green-400">{ordersByStatus.fulfilled}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 transition-all duration-200 hover:shadow-md">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Cancelled</p>
-                    <p className="text-lg font-bold text-red-600 dark:text-red-400">{ordersByStatus.cancelled}</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
