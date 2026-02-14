@@ -10,6 +10,7 @@ import { Users, CheckCircle2, XCircle, Clock, Shield, AlertTriangle } from 'luci
 import { UserProfile, AppRole, UserApprovalStatus } from '../../backend';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { parseApprovalError } from '../../utils/approvalErrors';
 
 interface UserManagementModuleProps {
   userProfile: UserProfile;
@@ -61,9 +62,11 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
       const statusText = status === UserApprovalStatus.approved ? 'approved' : 
                         status === UserApprovalStatus.rejected ? 'rejected' : 'set to pending';
       toast.success(`User ${statusText} successfully!`);
-    } catch (error) {
-      toast.error('Failed to update user approval status');
-      console.error(error);
+    } catch (error: any) {
+      // Parse the error and show user-friendly message
+      const errorInfo = parseApprovalError(error);
+      toast.error(errorInfo.message);
+      console.error('Approval error:', errorInfo);
     }
   };
 
@@ -78,9 +81,10 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
       toast.success('User role updated successfully!');
       setSelectedUser(null);
       setSelectedRole(null);
-    } catch (error) {
-      toast.error('Failed to update user role');
-      console.error(error);
+    } catch (error: any) {
+      const errorInfo = parseApprovalError(error);
+      toast.error(errorInfo.message);
+      console.error('Role assignment error:', errorInfo);
     }
   };
 
@@ -194,7 +198,7 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                                 onClick={() => handleApproval(account.id.toText(), UserApprovalStatus.approved)}
                                 disabled={setApproval.isPending}
                               >
-                                Approve
+                                {setApproval.isPending ? 'Processing...' : 'Approve'}
                               </Button>
                               <Button
                                 size="sm"
@@ -202,14 +206,14 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                                 onClick={() => handleApproval(account.id.toText(), UserApprovalStatus.rejected)}
                                 disabled={setApproval.isPending}
                               >
-                                Reject
+                                {setApproval.isPending ? 'Processing...' : 'Reject'}
                               </Button>
                             </>
                           )}
                           {account.approvalStatus === UserApprovalStatus.approved && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
+                                <Button size="sm" variant="destructive" disabled={setApproval.isPending}>
                                   Reject
                                 </Button>
                               </AlertDialogTrigger>
@@ -228,8 +232,9 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                                   <AlertDialogAction
                                     onClick={() => handleApproval(account.id.toText(), UserApprovalStatus.rejected)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    disabled={setApproval.isPending}
                                   >
-                                    Reject User
+                                    {setApproval.isPending ? 'Processing...' : 'Reject User'}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -242,6 +247,7 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                               setSelectedUser(account);
                               setSelectedRole(account.profile.appRole);
                             }}
+                            disabled={setApproval.isPending || assignAppRole.isPending}
                           >
                             Change Role
                           </Button>
@@ -284,7 +290,7 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setSelectedUser(null)}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleRoleAssignment} disabled={!selectedRole || assignAppRole.isPending}>
-                Update Role
+                {assignAppRole.isPending ? 'Updating...' : 'Update Role'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

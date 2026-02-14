@@ -1,94 +1,57 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Frontend performance optimizations for faster app open and reduced polling work",
+  "title": "User approval workflow: auto-refresh for admin actions and pending-user gating",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Minimize initial authenticated render work by showing an immediate app shell and deferring all module data fetching until Dashboard mount and module activation, without changing auth/approval flows.",
-      "acceptanceCriteria": [
-        "When the user is authenticated, the UI shows an immediate app shell (header/sidebar/skeletons) without waiting for non-essential data beyond the existing getBootstrapState call.",
-        "No module-specific data queries (orders/inventory/invoices/analytics/reports/etc.) start fetching until the Dashboard page is mounted and a module that needs them is active.",
-        "The Login/Profile Setup/Approval Pending screens continue to load via lazy loading (no regression from current Suspense behavior)."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/App.tsx",
-          "operation": "modify",
-          "description": "Keep the current lazy-loading auth/approval routing, and pass the already-fetched bootstrap-derived userProfile/isAdmin into the Dashboard component so Dashboard can render immediately without triggering additional non-essential queries on first mount."
-        },
-        {
-          "path": "frontend/src/pages/Dashboard.tsx",
-          "operation": "modify",
-          "description": "Accept initial user context (e.g., bootstrap userProfile/isAdmin) via props and avoid initiating redundant user/profile/admin queries on mount; ensure polling is enabled only while Dashboard is mounted (enable on mount, disable on unmount cleanup)."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Ensure all module-specific React Query hooks are disabled until Dashboard is active and the relevant module is active (gate query enabled/refetchInterval with PollingContext activeModule rather than only a dashboard-wide boolean)."
-        }
-      ]
-    },
-    {
       "id": "REQ-2",
-      "summary": "Reduce CPU/network usage by pausing polling off-Dashboard, pausing when tab is hidden, gating intervals per active module, and preventing DashboardHome auto-refresh UI from forcing full re-renders.",
+      "summary": "Auto-refresh User Management list after approve/reject and show robust English error toasts mapped from backend errors.",
       "acceptanceCriteria": [
-        "Polling is disabled when the user is not on the Dashboard page (e.g., Login/Profile Setup/Approval Pending).",
-        "Polling is paused when the browser tab is not visible and resumes when visible again.",
-        "React Query refetch intervals are gated by the active module (e.g., Orders polling only runs when the Orders module is active), rather than using a single dashboard-wide boolean only.",
-        "The DashboardHome header’s auto-refresh UI no longer triggers a full component re-render every 10 seconds solely to update a timestamp (use query metadata such as dataUpdatedAt or update only when relevant queries refresh)."
+        "After clicking Approve or Reject in UserManagementModule, the table row updates to the new status within one refresh cycle (via query invalidation and/or polling) and the action buttons update accordingly.",
+        "If setApproval fails due to authorization (non-primary admin / secondary admin), show an English toast error that includes the backend message when available.",
+        "If setApproval fails because the user has not completed profile setup, show an English toast error indicating the user must complete profile setup before approval can be changed."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/context/PollingContext.tsx",
-          "operation": "modify",
-          "description": "Extend polling state to include tab visibility awareness (pause/resume when document visibility changes) and provide a single derived flag/helper for whether polling should run based on Dashboard activity + tab visibility + activeModule."
+          "path": "frontend/src/utils/approvalErrors.ts",
+          "operation": "create",
+          "description": "Add a small error-normalization utility for approval/user-management flows that extracts a readable backend message (when available) and classifies common cases (authorization/secondary admin, missing profile setup). This will be used to produce English toast messages that reflect backend errors. (Uses the user-approval + authorization flows; verify the component's usage instructions before implementing.)"
         },
         {
-          "path": "frontend/src/pages/Dashboard.tsx",
+          "path": "frontend/src/components/modules/UserManagementModule.tsx",
           "operation": "modify",
-          "description": "Ensure PollingContext is correctly driven by navigation: set activeModule whenever the module changes, enable polling on mount, and disable polling in an effect cleanup when Dashboard unmounts so polling is off for Login/Profile Setup/Approval Pending."
+          "description": "Update approve/reject handlers to (1) trigger an immediate refresh cycle after mutation (ensure React Query invalidation/refetch of the users list query key used by useGetAllUserAccounts), and (2) use the new approval error utility to show specific English toast errors for authorization failures and missing-profile failures, including backend message text when present. (Relies on user-approval/authorization behavior; verify the component's usage instructions before implementing.)"
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Update refetchInterval/enabled logic for all polling queries to: (1) stop when not on Dashboard, (2) stop when tab is hidden, and (3) only run for the currently active module (dashboard vs orders vs inventory vs invoices vs analytics vs reports vs users vs notifications, etc.)."
-        },
-        {
-          "path": "frontend/src/components/modules/DashboardHome.tsx",
-          "operation": "modify",
-          "description": "Remove the 10-second setInterval-based lastUpdate state that forces a full component re-render; instead display a refresh indicator derived from React Query metadata (e.g., dataUpdatedAt from key dashboard queries) or update only when the relevant queries actually refresh."
+          "description": "Ensure the user-accounts query used by UserManagementModule is refetched promptly after setApproval succeeds (keep/confirm invalidation of the relevant query keys) and align any approval-related cache keys so the module reflects status changes without manual reload. (Relies on user-approval/authorization behavior; verify the component's usage instructions before implementing.)"
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Keep heavy UI modules and third-party generation libraries out of the initial bundle by enforcing lazy imports and on-demand loading for barcode/invoice/report generation features.",
+      "summary": "Improve ApprovalPending gating so pending users automatically re-check status, transition to dashboard when approved, and display a rejected-state screen with logout.",
       "acceptanceCriteria": [
-        "Dashboard modules remain code-split (lazy loaded) and do not get eagerly imported by shared components.",
-        "Barcode/invoice/report generation libraries (e.g., jsPDF/JsBarcode/QR-related code) are only loaded when the user opens the corresponding feature, not during initial app bootstrap.",
-        "Module loading fallbacks remain lightweight and do not depend on additional heavy libraries."
+        "While on the ApprovalPending screen, the app re-checks approval status periodically and automatically routes the user into the authenticated dashboard when approval becomes true (no manual reload required).",
+        "If the backend indicates the user has been rejected (e.g., via the existing rejection authorization error), show an English, user-friendly rejected message and provide a logout button that clears the Internet Identity session.",
+        "The periodic approval check stops once the user is approved and routed, or once the user logs out."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/Dashboard.tsx",
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Audit and adjust imports to ensure Dashboard modules remain lazily loaded and are not re-exported or imported by shared layout components in a way that would cause eager bundling; keep module fallback UI lightweight."
+          "description": "Add/adjust polling behavior for the authenticated bootstrap/approval gating so that when a user is pending (has profile, not approved, not admin) the app periodically refetches the bootstrap state (or approval status) until the state changes; polling must stop once approved/admin (dashboard) or logged out. (Relies on user-approval behavior; verify the component's usage instructions before implementing.)"
         },
         {
-          "path": "frontend/src/components/InvoiceGenerator.tsx",
+          "path": "frontend/src/components/ApprovalPending.tsx",
           "operation": "modify",
-          "description": "Ensure third-party document generation code remains strictly on-demand (only load jsPDF when the invoice generation action runs or when the generator is explicitly opened), and avoid any eager preloading that could occur during app bootstrap."
+          "description": "Enhance ApprovalPending to automatically re-check approval/rejection state while visible: (1) trigger periodic refresh of the approval/bootstrapped state and transition naturally to Dashboard via App's gating once approved, (2) detect rejected state (prefer a dedicated backend signal if available; otherwise fall back to interpreting backend authorization/rejection errors) and show a clear English rejected message, and (3) provide a logout button that clears the Internet Identity session and clears cached queries; ensure polling stops after approval transition or logout. (Relies on authorization + user-approval behavior; verify the component's usage instructions before implementing.)"
         },
         {
-          "path": "frontend/src/components/modules/InventoryReportModule.tsx",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Keep JsBarcode/jsPDF loading strictly gated to user-driven report generation flows and ensure no library-loading side effects occur until the Inventory Report module is mounted and the feature is activated."
-        },
-        {
-          "path": "frontend/src/components/BarcodeGenerator.tsx",
-          "operation": "modify",
-          "description": "Confirm barcode/QR generation dependencies remain dynamically loaded only when the barcode generator dialog/feature is opened, and avoid moving any heavy imports into top-level module scope."
+          "description": "Ensure App's gating reacts to the periodic refresh by re-rendering from ApprovalPending to Dashboard when bootstrap state changes to approved/admin, and handle bootstrap/approval-related errors in a user-friendly way consistent with the rejected-state UX. (Relies on user-approval/authorization behavior; verify the component's usage instructions before implementing.)"
         }
       ]
     }

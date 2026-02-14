@@ -1,30 +1,22 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
+  "summary": "Project to implement user management workflow with approve/reject actions and automatic referrals.",
   "architectural_notes": [],
   "known_issues": [],
   "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-reduce-initial-page-load-work-so-the-app-becomes-usable-as-quickly-as-possible-after-launch-both-on-first-open-and-on-refresh-while-preserving-existing-authentication-approval-flows",
-      "title": "Reduce initial page-load work so the app becomes usable as quickly as possible after launch (both on first open and on refresh), while preserving existing authentication/approval flows.",
-      "reqIds": [
-        "REQ-1"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-optimize-dashboard-polling-and-re-render-behavior-to-reduce-cpu-network-usage-during-normal-use-and-especially-on-app-open-including-pausing-background-polling-when-not-needed",
-      "title": "Optimize dashboard polling and re-render behavior to reduce CPU/network usage during normal use and especially on app open, including pausing background polling when not needed.",
+      "id": "feature-update-the-frontend-user-management-module-so-the-users-list-automatically-refreshes-after-approve-reject-actions-and-reflects-status-changes-without-a-manual-page-refresh-including-robust-error-messaging-based-on-backend-errors",
+      "title": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-ensure-large-heavy-ui-modules-and-third-party-libraries-are-not-part-of-the-initial-bundle-and-are-only-downloaded-when-the-user-navigates-to-the-relevant-module-or-opens-the-relevant-dialog",
-      "title": "Ensure large/heavy UI modules and third-party libraries are not part of the initial bundle and are only downloaded when the user navigates to the relevant module or opens the relevant dialog.",
+      "id": "feature-update-the-frontend-approval-gating-experience-so-pending-users-automatically-re-check-approval-status-and-transition-appropriately-redirect-to-the-dashboard-when-approved-and-show-a-clear-rejected-state-screen-message-when-rejected",
+      "title": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
       "reqIds": [
         "REQ-3"
       ],
@@ -34,20 +26,20 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Improve app performance: faster loading and quicker app launch/open time",
+      "summary": "Add user management workflow: approve/reject users and support automatic referrals",
       "reqIds": [],
       "status": "pending"
     },
     {
-      "id": "AR-5",
-      "summary": "Keep the backend bootstrap endpoint fast and minimal to support quick app open; avoid adding expensive computations or large data payloads to getBootstrapState.",
+      "id": "AR-2",
+      "summary": "Ensure the backend always persists a consistent UserAccount approval status when an admin approves/rejects a user, including creating a UserAccount record if one does not already exist (using the existing saved UserProfile for that principal).",
       "reqIds": [
-        "REQ-4"
+        "REQ-1"
       ],
       "status": "pending"
     }
   ],
-  "projectName": "Improve app performance for faster loading and quicker open time",
+  "projectName": "Update user management approve/reject workflow with automatic refresh",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

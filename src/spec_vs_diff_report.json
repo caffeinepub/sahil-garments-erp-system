@@ -1,80 +1,91 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T13:00:21.600Z",
-  "summary": "Diff implements an authenticated app shell during bootstrap, adds a PollingContext with tab-visibility tracking, and updates DashboardHome to use React Query metadata (dataUpdatedAt) instead of an interval for last-refresh UI. However, several performance requirements are not clearly met (notably deferring module-specific queries until a module is active, and lazy-loading heavy generation libraries), and multiple unrequested business-logic/UI features appear to be added.",
+  "generatedAt": "2026-02-14T10:07:58.476Z",
+  "summary": "REQ-2 and REQ-3 appear largely implemented on the frontend (polling on ApprovalPending, rejection UI + logout, and improved error parsing), but the diff summary does not provide evidence that REQ-1 backend `setApproval` was updated to ensure UserAccount creation/consistency. Also, REQ-2’s requirement to include the backend message in the authorization toast is not clearly met (toast shows only the normalized message). Several unrelated admin/ERP features were added/modified beyond the BuildRequest scope.",
   "missing_requirements": [
     {
       "id": "REQ-1",
-      "requirement": "No module-specific data queries (orders/inventory/invoices/analytics/reports/etc.) start fetching until the Dashboard page is mounted and a module that needs them is active.",
-      "reason": "DashboardHome immediately mounts multiple module-specific queries (orders, customers, products, invoices, notifications) as soon as the DashboardHome module renders. The diff does not show gating these queries on the active module; DashboardHome itself is the 'dashboard' module but still triggers many module-specific list queries.",
+      "requirement": "Backend `setApproval(user, status)` must always persist a consistent UserAccount approval status, creating a UserAccount from an existing saved UserProfile when missing; fail clearly if no UserProfile exists; and have `getAllUserAccounts()` reflect the update immediately after success.",
+      "reason": "The provided `backend/main.mo` diff is heavily truncated and does not show any changes to `setApproval`, userAccounts persistence logic, or error behavior regarding missing UserProfile. No concrete evidence is present that this backend requirement was implemented.",
       "evidence": [
-        "frontend/src/components/modules/DashboardHome.tsx",
-        "frontend/src/pages/Dashboard.tsx"
+        "backend/main.mo (truncated)"
       ]
     },
     {
       "id": "REQ-2",
-      "requirement": "React Query refetch intervals are gated by the active module (e.g., Orders polling only runs when the Orders module is active), rather than using a single dashboard-wide boolean only.",
-      "reason": "While PollingContext introduces `activeModule` and `shouldPoll`, the provided (truncated) useQueries diff does not include concrete evidence that individual queries' `refetchInterval` is conditioned on `activeModule` per module/query (only that a context exists and is imported).",
+      "requirement": "If `setApproval` fails due to authorization (non-primary admin / secondary admin), show an English toast error that includes the backend message when available.",
+      "reason": "`parseApprovalError` captures `backendMessage`, but `UserManagementModule` displays only `errorInfo.message` via `toast.error(errorInfo.message)` and does not include `errorInfo.backendMessage` in the toast text.",
       "evidence": [
-        "frontend/src/context/PollingContext.tsx",
-        "frontend/src/hooks/useQueries.ts"
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "requirement": "Barcode/invoice/report generation libraries (e.g., jsPDF/JsBarcode/QR-related code) are only loaded when the user opens the corresponding feature, not during initial app bootstrap.",
-      "reason": "InvoiceModule imports `InvoiceGenerator` via a direct import, which will pull it into the InvoiceModule bundle as soon as the InvoiceModule is loaded (not on opening the preview/dialog). The diff does not show converting this to a lazy/dynamic import tied to opening the preview.",
-      "evidence": [
-        "frontend/src/components/modules/InvoiceModule.tsx"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "requirement": "getBootstrapState remains minimal and O(1), returning only userProfile, isApproved, and isAdmin, with no iteration over stored datasets.",
-      "reason": "backend/main.mo is truncated and does not show the implementation of `getBootstrapState`, so there is no diff evidence confirming it remains minimal/O(1) and returns only the specified fields.",
-      "evidence": [
-        "backend/main.mo"
+        "frontend/src/utils/approvalErrors.ts",
+        "frontend/src/components/modules/UserManagementModule.tsx"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Added/changed role-based access control around 'primary admins' vs 'secondary admins', including a new 'Admin Settings' entry restricted to primary admins and a hardcoded secondary admin email.",
-      "reason": "BuildRequest explicitly states non-goal: do not change business logic (roles) beyond performance-related behavior. These appear to be new/modified authorization/product behavior rather than performance-only changes.",
+      "description": "Added/modified polling infrastructure (PollingProvider/context and module-specific polling gating) beyond what is explicitly requested for ApprovalPending polling.",
+      "reason": "REQ-3 only requires periodic approval re-check on the ApprovalPending screen; broader app-wide/module-based polling is not requested.",
       "evidence": [
-        "frontend-file-summaries.txt",
+        "frontend/src/App.tsx",
         "frontend/src/hooks/useQueries.ts",
-        "frontend/src/components/modules/UserManagementModule.tsx"
+        "frontend-file-summaries.txt (PollingProvider/module-specific polling gating references)"
       ]
     },
     {
-      "description": "Admin-only destructive actions added to modules (e.g., delete all inventory, delete all orders, admin-only delete customer) with new confirmation/security warning UI.",
-      "reason": "Not requested; also conflicts with non-goal of not changing ERP business logic beyond performance-related behavior.",
+      "description": "Added a new Sidebar navigation entry for “Admin Settings” visible only to primary admins (isSuperAdmin).",
+      "reason": "BuildRequest does not ask for new navigation entries or an Admin Settings section.",
       "evidence": [
-        "frontend-file-summaries.txt"
+        "frontend-file-summaries.txt (frontend/src/components/Sidebar.tsx)"
       ]
     },
     {
-      "description": "UI/UX changes unrelated to performance (e.g., English UI text changes, new footer attribution, 'GPU-optimized animations', OKLCH color system and invoice document styling).",
-      "reason": "Not requested by the performance-focused BuildRequest; these are design/content changes outside stated requirements.",
+      "description": "Implemented admin-only destructive actions such as delete customers, delete all orders, and delete all inventory with confirmation/security warnings.",
+      "reason": "Not part of the approve/reject workflow or approval gating requirements.",
       "evidence": [
-        "frontend-file-summaries.txt"
+        "frontend-file-summaries.txt (frontend/src/components/modules/CustomersModule.tsx)",
+        "frontend-file-summaries.txt (frontend/src/components/modules/OrdersModule.tsx)",
+        "frontend-file-summaries.txt (frontend/src/components/modules/InventoryModule.tsx)"
+      ]
+    },
+    {
+      "description": "Added/expanded Inventory barcode scanning via mobile camera and barcode generator features.",
+      "reason": "Unrelated to user approval workflow; not requested.",
+      "evidence": [
+        "frontend-file-summaries.txt (frontend/src/components/modules/InventoryModule.tsx)"
+      ]
+    },
+    {
+      "description": "Added a new `useGetInvoice` hook and other non-approval related query/hook enhancements for ERP features.",
+      "reason": "Not requested by REQ-1/2/3; scope creep beyond approval workflow.",
+      "evidence": [
+        "frontend-file-summaries.txt (frontend/src/hooks/useQueries.ts)"
+      ]
+    },
+    {
+      "description": "Enhanced DashboardHome with “GPU-optimized animations” and additional metric computations.",
+      "reason": "Not requested; unrelated UI/UX changes beyond approval workflow.",
+      "evidence": [
+        "frontend-file-summaries.txt (frontend/src/components/modules/DashboardHome.tsx)"
+      ]
+    },
+    {
+      "description": "Changed `project_state.json` summary to mention “automatic referrals,” which is explicitly a non-goal unless specified with rules/data fields.",
+      "reason": "BuildRequest explicitly lists referral/affiliate program as a non-goal; mentioning/targeting it is out of scope (even if not implemented in code).",
+      "evidence": [
+        "project_state.json"
       ]
     }
   ],
-  "confidence": 0.67,
+  "confidence": 0.62,
   "changed_files": [
     "backend/main.mo",
     "frontend-file-summaries.txt",
     "frontend/src/App.tsx",
-    "frontend/src/components/modules/DashboardHome.tsx",
-    "frontend/src/components/modules/InvoiceModule.tsx",
+    "frontend/src/components/ApprovalPending.tsx",
     "frontend/src/components/modules/UserManagementModule.tsx",
-    "frontend/src/context/PollingContext.tsx",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/Dashboard.tsx",
+    "frontend/src/utils/approvalErrors.ts",
     "project_state.json"
   ]
 }

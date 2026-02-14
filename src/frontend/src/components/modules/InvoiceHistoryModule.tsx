@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
-import { useListInvoices, useListCustomers, useListProducts } from '../../hooks/useQueries';
+import { useListInvoices, useListCustomers, useListProducts, useClearAllInvoices } from '../../hooks/useQueries';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Download, FileText, Eye, Filter, X, Calendar, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Search, Download, FileText, Eye, Filter, X, Calendar, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceGenerator from '../InvoiceGenerator';
 import { Invoice, Customer, Product, T as InvoiceStatus } from '../../backend';
@@ -21,6 +22,7 @@ export default function InvoiceHistoryModule({ userProfile, isAdmin }: InvoiceHi
   const { data: invoices = [], isLoading: invoicesLoading } = useListInvoices();
   const { data: customers = [], isLoading: customersLoading } = useListCustomers();
   const { data: products = [], isLoading: productsLoading } = useListProducts();
+  const clearAllInvoicesMutation = useClearAllInvoices();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('all');
@@ -30,6 +32,7 @@ export default function InvoiceHistoryModule({ userProfile, isAdmin }: InvoiceHi
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   const canAccessInvoiceHistory = isAdmin || userProfile.appRole === 'sales';
 
@@ -193,6 +196,17 @@ export default function InvoiceHistoryModule({ userProfile, isAdmin }: InvoiceHi
     setPreviewDialogOpen(true);
   };
 
+  const handleClearAllInvoices = async () => {
+    try {
+      await clearAllInvoicesMutation.mutateAsync();
+      toast.success('All invoices have been cleared successfully!');
+      setClearDialogOpen(false);
+    } catch (error: any) {
+      console.error('Clear invoices error:', error);
+      toast.error(error.message || 'Failed to clear invoices. Please try again.');
+    }
+  };
+
   const exportToPDF = async () => {
     toast.info('PDF export functionality would generate a comprehensive report of filtered invoices');
     // In a real implementation, this would use jsPDF to create a multi-page PDF
@@ -298,6 +312,45 @@ export default function InvoiceHistoryModule({ userProfile, isAdmin }: InvoiceHi
           <p className="text-muted-foreground">View and manage all generated invoices with advanced filtering</p>
         </div>
         <div className="flex gap-2">
+          {isAdmin && invoices.length > 0 && (
+            <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clear List
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear All Invoices?</AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <p className="font-semibold text-destructive">
+                      Warning: This action will permanently delete all {invoices.length} invoice{invoices.length !== 1 ? 's' : ''} from the system.
+                    </p>
+                    <p>This operation cannot be undone. All invoice records will be removed from the database.</p>
+                    <p>Are you sure you want to proceed?</p>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={clearAllInvoicesMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleClearAllInvoices}
+                    disabled={clearAllInvoicesMutation.isPending}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    {clearAllInvoicesMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Clearing...
+                      </>
+                    ) : (
+                      'Clear All Invoices'
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           <Button onClick={exportToPDF} variant="outline" size="sm">
             <FileText className="mr-2 h-4 w-4" />
             Export PDF
@@ -473,7 +526,8 @@ export default function InvoiceHistoryModule({ userProfile, isAdmin }: InvoiceHi
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => handlePreview(invoice)}>
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 mr-1" />
+                          Preview
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -490,52 +544,24 @@ export default function InvoiceHistoryModule({ userProfile, isAdmin }: InvoiceHi
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Invoice Preview - SG-{selectedInvoice?.invoiceId.toString()}</DialogTitle>
-            <DialogDescription>Preview and download invoice documents</DialogDescription>
+            <DialogDescription>
+              Preview and download invoice for {selectedInvoice && getCustomerName(selectedInvoice.customerId)}
+            </DialogDescription>
           </DialogHeader>
-          {selectedInvoice && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                <div>
-                  <p className="text-sm text-muted-foreground">Customer</p>
-                  <p className="font-medium">{getCustomerName(selectedInvoice.customerId)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Product(s)</p>
-                  <p className="font-medium">
-                    {selectedInvoice.productIds && selectedInvoice.productIds.length > 0
-                      ? `${selectedInvoice.productIds.length} item(s)`
-                      : getProductName(selectedInvoice.productId)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Invoice Date</p>
-                  <p className="font-medium">{formatDate(selectedInvoice.created)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Amount</p>
-                  <p className="font-medium text-lg">{formatCurrency(selectedInvoice.total)}</p>
-                </div>
+          {selectedInvoice && (() => {
+            const customer = customers.find((c) => c.id === selectedInvoice.customerId);
+            return customer ? (
+              <InvoiceGenerator
+                invoice={selectedInvoice}
+                customer={customer}
+                products={products}
+              />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Customer not found
               </div>
-
-              {(() => {
-                const customer = customers.find((c) => c.id === selectedInvoice.customerId);
-
-                // Get all products for this invoice
-                const invoiceProducts =
-                  selectedInvoice.productIds && selectedInvoice.productIds.length > 0
-                    ? selectedInvoice.productIds
-                        .map((pid) => products.find((p) => p.productId === pid))
-                        .filter((p): p is Product => p !== undefined)
-                    : products.filter((p) => p.productId === selectedInvoice.productId);
-
-                if (!customer || invoiceProducts.length === 0) {
-                  return <div className="text-center py-8 text-muted-foreground">Unable to load invoice details</div>;
-                }
-
-                return <InvoiceGenerator invoice={selectedInvoice} customer={customer} products={invoiceProducts} />;
-              })()}
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

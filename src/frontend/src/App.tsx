@@ -1,99 +1,74 @@
-import { lazy, Suspense } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
 import { useGetBootstrapState } from './hooks/useQueries';
-import { Toaster } from '@/components/ui/sonner';
-import { ThemeProvider } from 'next-themes';
-import { PollingProvider } from './context/PollingContext';
+import LoginPage from './pages/LoginPage';
+import ProfileSetup from './components/ProfileSetup';
+import ApprovalPending from './components/ApprovalPending';
 import LoadingWorkspace from './components/LoadingWorkspace';
 import AuthenticatedAppShell from './components/AuthenticatedAppShell';
+import { PollingProvider } from './context/PollingContext';
+import { isRejectedError } from './utils/approvalErrors';
 
-// Lazy load components for better performance
-const LoginPage = lazy(() => import('./pages/LoginPage'));
-const ProfileSetup = lazy(() => import('./components/ProfileSetup'));
-const ApprovalPending = lazy(() => import('./components/ApprovalPending'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 
 export default function App() {
-  const { identity, loginStatus, isInitializing } = useInternetIdentity();
-  const { data: bootstrap, isLoading: bootstrapLoading, isFetched: bootstrapFetched } = useGetBootstrapState();
-
+  const { identity, isInitializing } = useInternetIdentity();
   const isAuthenticated = !!identity;
 
-  // Show loading workspace during initialization or login
-  if (isInitializing || loginStatus === 'logging-in') {
-    return (
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <LoadingWorkspace />
-        <Toaster />
-      </ThemeProvider>
-    );
+  // Fetch bootstrap state after authentication
+  const {
+    data: bootstrapState,
+    isLoading: bootstrapLoading,
+    isFetched: bootstrapFetched,
+    error: bootstrapError,
+  } = useGetBootstrapState();
+
+  // Show loading during initialization
+  if (isInitializing) {
+    return <LoadingWorkspace />;
   }
 
-  // Not authenticated - show login (no polling)
+  // Show login page if not authenticated
   if (!isAuthenticated) {
-    return (
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <Suspense fallback={<LoadingWorkspace />}>
-          <LoginPage />
-        </Suspense>
-        <Toaster />
-      </ThemeProvider>
-    );
+    return <LoginPage />;
   }
 
-  // Authenticated - show immediate app shell while bootstrap loads
-  if (!bootstrapFetched || bootstrapLoading || !bootstrap) {
-    return (
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <PollingProvider>
-          <AuthenticatedAppShell isLoading={true} />
-        </PollingProvider>
-        <Toaster />
-      </ThemeProvider>
-    );
+  // Show loading while fetching bootstrap state
+  if (bootstrapLoading || !bootstrapFetched) {
+    return <AuthenticatedAppShell />;
   }
 
-  // Bootstrap loaded - route based on state
-  const { userProfile, isApproved, isAdmin } = bootstrap;
-
-  // No profile - show profile setup (no polling)
-  if (!userProfile) {
-    return (
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <PollingProvider>
-          <Suspense fallback={<AuthenticatedAppShell isLoading={true} />}>
-            <ProfileSetup />
-          </Suspense>
-        </PollingProvider>
-        <Toaster />
-      </ThemeProvider>
-    );
+  // Handle bootstrap errors (including rejection)
+  if (bootstrapError) {
+    if (isRejectedError(bootstrapError)) {
+      // User has been rejected - ApprovalPending will show rejection UI
+      if (bootstrapState?.userProfile) {
+        return <ApprovalPending userProfile={bootstrapState.userProfile} />;
+      }
+    }
+    // Other errors - show loading or error state
+    return <LoadingWorkspace />;
   }
 
-  // Has profile but not approved and not admin - show approval pending (no polling)
-  if (!isApproved && !isAdmin) {
-    return (
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <PollingProvider>
-          <Suspense fallback={<AuthenticatedAppShell isLoading={true} />}>
-            <ApprovalPending userProfile={userProfile} />
-          </Suspense>
-        </PollingProvider>
-        <Toaster />
-      </ThemeProvider>
-    );
+  // Profile setup required
+  if (!bootstrapState?.userProfile) {
+    return <ProfileSetup />;
   }
 
-  // Approved or admin - show dashboard with polling enabled
-  // Pass bootstrap data to Dashboard to avoid redundant queries
+  // Approval pending (not admin, not approved)
+  if (!bootstrapState.isAdmin && !bootstrapState.isApproved) {
+    return <ApprovalPending userProfile={bootstrapState.userProfile} />;
+  }
+
+  // Authenticated and approved - show dashboard
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <PollingProvider>
-        <Suspense fallback={<AuthenticatedAppShell isLoading={true} />}>
-          <Dashboard initialUserProfile={userProfile} initialIsAdmin={isAdmin} />
-        </Suspense>
-      </PollingProvider>
-      <Toaster />
-    </ThemeProvider>
+    <PollingProvider>
+      <Suspense fallback={<LoadingWorkspace />}>
+        <Dashboard 
+          initialUserProfile={bootstrapState.userProfile} 
+          initialIsAdmin={bootstrapState.isAdmin}
+        />
+      </Suspense>
+    </PollingProvider>
   );
 }

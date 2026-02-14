@@ -1,67 +1,51 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T13:00:21.603Z",
+  "generatedAt": "2026-02-14T10:07:58.478Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 4,
-    "implemented": 3,
+    "total": 3,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Reduce initial page-load work so the app becomes usable as quickly as possible after launch (both on first open and on refresh), while preserving existing authentication/approval flows.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/hooks/useQueries.ts"
-        ],
-        "matchedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/hooks/useQueries.ts"
-        ]
+        "summary": "Ensure the backend always persists a consistent UserAccount approval status when an admin approves/rejects a user, including creating a UserAccount record if one does not already exist (using the existing saved UserProfile for that principal).",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "Optimize dashboard polling and re-render behavior to reduce CPU/network usage during normal use and especially on app open, including pausing background polling when not needed.",
+        "summary": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/context/PollingContext.tsx",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/modules/DashboardHome.tsx"
+          "frontend/src/utils/approvalErrors.ts",
+          "frontend/src/components/modules/UserManagementModule.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ],
         "matchedFiles": [
-          "frontend/src/context/PollingContext.tsx",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/modules/DashboardHome.tsx"
+          "frontend/src/utils/approvalErrors.ts",
+          "frontend/src/components/modules/UserManagementModule.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Ensure large/heavy UI modules and third-party libraries are not part of the initial bundle and are only downloaded when the user navigates to the relevant module or opens the relevant dialog.",
+        "summary": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/components/InvoiceGenerator.tsx",
-          "frontend/src/components/modules/InventoryReportModule.tsx",
-          "frontend/src/components/BarcodeGenerator.tsx"
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/ApprovalPending.tsx",
+          "frontend/src/App.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/pages/Dashboard.tsx"
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/ApprovalPending.tsx",
+          "frontend/src/App.tsx"
         ]
-      },
-      {
-        "id": "REQ-4",
-        "summary": "Keep the backend bootstrap endpoint fast and minimal to support quick app open; avoid adding expensive computations or large data payloads to getBootstrapState.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
       }
     ]
   },
@@ -72,12 +56,10 @@
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
     "frontend/src/App.tsx",
-    "frontend/src/components/modules/DashboardHome.tsx",
-    "frontend/src/components/modules/InvoiceModule.tsx",
+    "frontend/src/components/ApprovalPending.tsx",
     "frontend/src/components/modules/UserManagementModule.tsx",
-    "frontend/src/context/PollingContext.tsx",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/Dashboard.tsx",
+    "frontend/src/utils/approvalErrors.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

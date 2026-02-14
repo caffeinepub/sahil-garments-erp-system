@@ -223,6 +223,7 @@ export interface _SERVICE {
     [BarcodeBatchExportRequest],
     ExternalBlob
   >,
+  'clearAllInvoices' : ActorMethod<[], undefined>,
   'clearPreviousRejection' : ActorMethod<[Principal], undefined>,
   'createCustomer' : ActorMethod<[string, string, string, string], bigint>,
   'createDataEntry' : ActorMethod<[string, bigint, bigint, bigint], bigint>,

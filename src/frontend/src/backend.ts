@@ -289,6 +289,7 @@ export interface backendInterface {
     assignAppRole(user: Principal, role: AppRole): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     batchExportBarcodes(arg0: BarcodeBatchExportRequest): Promise<ExternalBlob>;
+    clearAllInvoices(): Promise<void>;
     clearPreviousRejection(user: Principal): Promise<void>;
     createCustomer(name: string, email: string, phone: string, address: string): Promise<bigint>;
     createDataEntry(entityType: string, entryId: bigint, amount: bigint, quantity: bigint): Promise<bigint>;
@@ -545,6 +546,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.batchExportBarcodes(to_candid_BarcodeBatchExportRequest_n13(this._uploadFile, this._downloadFile, arg0));
             return from_candid_ExternalBlob_n17(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async clearAllInvoices(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.clearAllInvoices();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.clearAllInvoices();
+            return result;
         }
     }
     async clearPreviousRejection(arg0: Principal): Promise<void> {

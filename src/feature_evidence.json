@@ -2,39 +2,12 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-reduce-initial-page-load-work-so-the-app-becomes-usable-as-quickly-as-possible-after-launch-both-on-first-open-and-on-refresh-while-preserving-existing-authentication-approval-flows",
-      "featureTitle": "Reduce initial page-load work so the app becomes usable as quickly as possible after launch (both on first open and on refresh), while preserving existing authentication/approval flows.",
+      "featureId": "feature-update-the-frontend-user-management-module-so-the-users-list-automatically-refreshes-after-approve-reject-actions-and-reflects-status-changes-without-a-manual-page-refresh-including-robust-error-messaging-based-on-backend-errors",
+      "featureTitle": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
       "files": [
-        "frontend/src/App.tsx",
+        "frontend/src/components/modules/UserManagementModule.tsx",
         "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/Dashboard.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "blob-storage@4.0.0",
-        "camera@1.0.0",
-        "qr-code@1.0.0",
-        "http-outcalls@3.0.0",
-        "user-approval@3.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-1"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-optimize-dashboard-polling-and-re-render-behavior-to-reduce-cpu-network-usage-during-normal-use-and-especially-on-app-open-including-pausing-background-polling-when-not-needed",
-      "featureTitle": "Optimize dashboard polling and re-render behavior to reduce CPU/network usage during normal use and especially on app open, including pausing background polling when not needed.",
-      "files": [
-        "frontend/src/components/modules/DashboardHome.tsx",
-        "frontend/src/context/PollingContext.tsx",
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/Dashboard.tsx"
+        "frontend/src/utils/approvalErrors.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -55,10 +28,12 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-ensure-large-heavy-ui-modules-and-third-party-libraries-are-not-part-of-the-initial-bundle-and-are-only-downloaded-when-the-user-navigates-to-the-relevant-module-or-opens-the-relevant-dialog",
-      "featureTitle": "Ensure large/heavy UI modules and third-party libraries are not part of the initial bundle and are only downloaded when the user navigates to the relevant module or opens the relevant dialog.",
+      "featureId": "feature-update-the-frontend-approval-gating-experience-so-pending-users-automatically-re-check-approval-status-and-transition-appropriately-redirect-to-the-dashboard-when-approved-and-show-a-clear-rejected-state-screen-message-when-rejected",
+      "featureTitle": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
       "files": [
-        "frontend/src/pages/Dashboard.tsx"
+        "frontend/src/App.tsx",
+        "frontend/src/components/ApprovalPending.tsx",
+        "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
         "authorization@4.0.0",

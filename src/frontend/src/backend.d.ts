@@ -196,6 +196,7 @@ export interface backendInterface {
     assignAppRole(user: Principal, role: AppRole): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     batchExportBarcodes(arg0: BarcodeBatchExportRequest): Promise<ExternalBlob>;
+    clearAllInvoices(): Promise<void>;
     clearPreviousRejection(user: Principal): Promise<void>;
     createCustomer(name: string, email: string, phone: string, address: string): Promise<bigint>;
     createDataEntry(entityType: string, entryId: bigint, amount: bigint, quantity: bigint): Promise<bigint>;

@@ -15,8 +15,6 @@ import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
 
-
-
 actor {
   include MixinStorage();
 
@@ -1126,6 +1124,16 @@ actor {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can view invoices");
     };
     invoices.get(invoiceId);
+  };
+
+  // RESTRICTED: Only admins can clear all invoices (bulk delete)
+  public shared ({ caller }) func clearAllInvoices() : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can clear all invoices");
+    };
+
+    invoices.clear();
+    nextInvoiceId := 1;
   };
 
   public shared query ({ caller }) func listInvoices() : async [Invoice] {

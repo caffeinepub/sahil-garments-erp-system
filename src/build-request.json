@@ -1,88 +1,72 @@
 {
   "kind": "build_request",
-  "title": "Improve app performance for faster loading and quicker open time",
+  "title": "Update user management approve/reject workflow with automatic refresh",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Reduce initial page-load work so the app becomes usable as quickly as possible after launch (both on first open and on refresh), while preserving existing authentication/approval flows.",
-      "target": "frontend",
+      "text": "Ensure the backend always persists a consistent UserAccount approval status when an admin approves/rejects a user, including creating a UserAccount record if one does not already exist (using the existing saved UserProfile for that principal).",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-10"
         ],
         "quotes": [
-          "please fast loading aap  and speed open"
+          "user management reject and approved automatic refers please updated"
         ]
       },
       "acceptanceCriteria": [
-        "When the user is authenticated, the UI shows an immediate app shell (header/sidebar/skeletons) without waiting for non-essential data beyond the existing getBootstrapState call.",
-        "No module-specific data queries (orders/inventory/invoices/analytics/reports/etc.) start fetching until the Dashboard page is mounted and a module that needs them is active.",
-        "The Login/Profile Setup/Approval Pending screens continue to load via lazy loading (no regression from current Suspense behavior)."
+        "Calling the existing backend setApproval(user, status) results in userAccounts containing a record for that user principal with approvalStatus matching the requested status (approved/rejected/pending).",
+        "If the user has not completed profile setup (no UserProfile saved), setApproval continues to fail with a clear error (no silent creation of placeholder profiles).",
+        "After a successful setApproval call, getAllUserAccounts() reflects the updated status without requiring any other backend call/mutation."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Optimize dashboard polling and re-render behavior to reduce CPU/network usage during normal use and especially on app open, including pausing background polling when not needed.",
+      "text": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-10"
         ],
         "quotes": [
-          "please fast loading aap  and speed open"
+          "user management reject and approved automatic refers please updated"
         ]
       },
       "acceptanceCriteria": [
-        "Polling is disabled when the user is not on the Dashboard page (e.g., Login/Profile Setup/Approval Pending).",
-        "Polling is paused when the browser tab is not visible and resumes when visible again.",
-        "React Query refetch intervals are gated by the active module (e.g., Orders polling only runs when the Orders module is active), rather than using a single dashboard-wide boolean only.",
-        "The DashboardHome header’s auto-refresh UI no longer triggers a full component re-render every 10 seconds solely to update a timestamp (use query metadata such as dataUpdatedAt or update only when relevant queries refresh)."
+        "After clicking Approve or Reject in UserManagementModule, the table row updates to the new status within one refresh cycle (via query invalidation and/or polling) and the action buttons update accordingly.",
+        "If setApproval fails due to authorization (non-primary admin / secondary admin), show an English toast error that includes the backend message when available.",
+        "If setApproval fails because the user has not completed profile setup, show an English toast error indicating the user must complete profile setup before approval can be changed."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Ensure large/heavy UI modules and third-party libraries are not part of the initial bundle and are only downloaded when the user navigates to the relevant module or opens the relevant dialog.",
+      "text": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-10"
         ],
         "quotes": [
-          "please fast loading aap  and speed open"
+          "user management reject and approved automatic refers please updated"
         ]
       },
       "acceptanceCriteria": [
-        "Dashboard modules remain code-split (lazy loaded) and do not get eagerly imported by shared components.",
-        "Barcode/invoice/report generation libraries (e.g., jsPDF/JsBarcode/QR-related code) are only loaded when the user opens the corresponding feature, not during initial app bootstrap.",
-        "Module loading fallbacks remain lightweight and do not depend on additional heavy libraries."
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "text": "Keep the backend bootstrap endpoint fast and minimal to support quick app open; avoid adding expensive computations or large data payloads to getBootstrapState.",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-1"
-        ],
-        "quotes": [
-          "please fast loading aap  and speed open"
-        ]
-      },
-      "acceptanceCriteria": [
-        "getBootstrapState continues to return only: userProfile, isApproved, and isAdmin (no additional large lists or computed aggregates added).",
-        "All work inside getBootstrapState remains O(1) relative to stored dataset sizes (no iteration over products/orders/invoices/customers)."
+        "While on the ApprovalPending screen, the app re-checks approval status periodically and automatically routes the user into the authenticated dashboard when approval becomes true (no manual reload required).",
+        "If the backend indicates the user has been rejected (e.g., via the existing rejection authorization error), show an English, user-friendly rejected message and provide a logout button that clears the Internet Identity session.",
+        "The periodic approval check stops once the user is approved and routed, or once the user logs out."
       ]
     }
   ],
   "constraints": [
-    "Do not edit files under frontend/src/hooks/useInternetIdentity.ts or .tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or any files under frontend/src/components/ui (these are immutable).",
-    "Backend must remain a single Motoko actor in backend/main.mo; only add backend/migration.mo changes if state schema upgrades are required."
+    "Backend must remain a single Motoko actor in backend/main.mo (no additional backend services).",
+    "Do not edit immutable frontend paths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui.",
+    "Use English for any user-facing text."
   ],
   "nonGoals": [
-    "Do not add new ERP features or change business logic (inventory, orders, invoices, roles) beyond performance-related behavior.",
-    "Do not introduce external databases, third-party auth providers, WebSockets, or new backend services."
+    "Do not implement a referral/affiliate program or referral codes unless explicitly specified with rules and data fields.",
+    "Do not add third-party authentication providers beyond Internet Identity.",
+    "Do not introduce external databases or services."
   ],
   "imageRequirements": {
     "required": [],

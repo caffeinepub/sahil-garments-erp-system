@@ -258,6 +258,7 @@ export const idlService = IDL.Service({
       [ExternalBlob],
       [],
     ),
+  'clearAllInvoices' : IDL.Func([], [], []),
   'clearPreviousRejection' : IDL.Func([IDL.Principal], [], []),
   'createCustomer' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -637,6 +638,7 @@ export const idlFactory = ({ IDL }) => {
         [ExternalBlob],
         [],
       ),
+    'clearAllInvoices' : IDL.Func([], [], []),
     'clearPreviousRejection' : IDL.Func([IDL.Principal], [], []),
     'createCustomer' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],

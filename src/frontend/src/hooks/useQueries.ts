@@ -11,6 +11,7 @@ const NOTIFICATION_REFRESH_INTERVAL = 15000; // 15 seconds
 const ORDER_REFRESH_INTERVAL = 10000; // 10 seconds for real-time sync
 const INVENTORY_REFRESH_INTERVAL = 10000; // 10 seconds for real-time sync
 const INVOICE_REFRESH_INTERVAL = 10000; // 10 seconds for real-time sync
+const APPROVAL_PENDING_REFRESH_INTERVAL = 5000; // 5 seconds for approval status checks
 
 // Enhanced cache times for better performance
 const LONG_STALE_TIME = 60000; // 1 minute
@@ -21,7 +22,7 @@ const SHORT_STALE_TIME = 10000; // 10 seconds
 const SECONDARY_ADMIN_EMAIL = 'sahilgarments16@gmail.com';
 
 // Bootstrap Query - Single batched call for initial app state
-export function useGetBootstrapState() {
+export function useGetBootstrapState(enablePolling = false) {
   const { actor, isFetching: actorFetching } = useActor();
   const queryClient = useQueryClient();
 
@@ -42,8 +43,10 @@ export function useGetBootstrapState() {
     },
     enabled: !!actor && !actorFetching,
     retry: false,
-    staleTime: LONG_STALE_TIME,
+    staleTime: enablePolling ? 0 : LONG_STALE_TIME,
     gcTime: 300000, // 5 minutes
+    refetchInterval: enablePolling ? APPROVAL_PENDING_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
   });
 
   return {
@@ -166,73 +169,20 @@ export function useIsSecondaryAdmin() {
 // Check if user can access User Management (primary admin only)
 export function useCanAccessUserManagement() {
   const { data: isAdmin, isLoading: isAdminLoading } = useIsCallerAdmin();
-  const { data: isSecondaryAdmin, isLoading: isSecondaryLoading } = useIsSecondaryAdmin();
+  const { data: isSecondaryAdmin, isLoading: isSecondaryAdminLoading } = useIsSecondaryAdmin();
 
   return useQuery<boolean>({
     queryKey: ['canAccessUserManagement', isAdmin, isSecondaryAdmin],
     queryFn: async () => {
       // Only primary admins (not secondary admins) can access User Management
-      // If user is admin but NOT secondary admin, they can access
-      if (isAdmin === true && isSecondaryAdmin === false) {
-        return true;
-      }
-      return false;
+      return isAdmin === true && isSecondaryAdmin === false;
     },
-    enabled: !isAdminLoading && !isSecondaryLoading && isAdmin !== undefined && isSecondaryAdmin !== undefined,
+    enabled: isAdmin !== undefined && isSecondaryAdmin !== undefined,
     staleTime: LONG_STALE_TIME,
     gcTime: 300000,
   });
 }
 
-// Secondary Admin Email Management (Primary Admin Only)
-export function useListSecondaryAdminEmails() {
-  const { actor, isFetching } = useActor();
-  const polling = usePolling();
-
-  return useQuery<string[]>({
-    queryKey: ['secondaryAdminEmails'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listSecondaryAdminEmails();
-    },
-    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'secondaryAdmins',
-    refetchInterval: (polling.shouldPoll && polling.activeModule === 'secondaryAdmins') ? NOTIFICATION_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
-  });
-}
-
-export function useAddSecondaryAdminEmail() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (email: string) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addSecondaryAdminEmail(email);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
-    },
-  });
-}
-
-export function useRemoveSecondaryAdminEmail() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (email: string) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.removeSecondaryAdminEmail(email);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
-    },
-  });
-}
-
-// Approval Queries
 export function useIsCallerApproved() {
   const { actor, isFetching } = useActor();
 
@@ -260,25 +210,23 @@ export function useRequestApproval() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
     },
   });
 }
 
-export function useListApprovals() {
+export function useGetAllUserAccounts() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
 
-  return useQuery<UserApprovalInfo[]>({
-    queryKey: ['approvals'],
+  return useQuery({
+    queryKey: ['allUserAccounts'],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.listApprovals();
+      if (!actor) throw new Error('Actor not available');
+      return actor.getAllUserAccounts();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'users',
-    refetchInterval: (polling.shouldPoll && polling.activeModule === 'users') ? NOTIFICATION_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching,
     staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
+    gcTime: 300000,
   });
 }
 
@@ -289,21 +237,20 @@ export function useSetApproval() {
   return useMutation({
     mutationFn: async ({ user, status }: { user: Principal; status: UserApprovalStatus }) => {
       if (!actor) throw new Error('Actor not available');
-      // Convert UserApprovalStatus enum to backend format
-      let backendStatus: { approved: null } | { rejected: null } | { pending: null };
-      if (status === UserApprovalStatus.approved) {
-        backendStatus = { approved: null };
-      } else if (status === UserApprovalStatus.rejected) {
-        backendStatus = { rejected: null };
-      } else {
-        backendStatus = { pending: null };
-      }
-      return actor.setApproval(user, backendStatus);
+      
+      // Convert UserApprovalStatus enum to backend ApprovalStatus
+      const backendStatus = status === UserApprovalStatus.approved 
+        ? { approved: null }
+        : status === UserApprovalStatus.rejected
+        ? { rejected: null }
+        : { pending: null };
+      
+      return actor.setApproval(user, backendStatus as any);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['userAccounts'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      // Immediately invalidate and refetch user accounts list
+      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
     },
   });
 }
@@ -318,15 +265,16 @@ export function useAssignAppRole() {
       return actor.assignAppRole(user, role);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
     },
   });
 }
 
 // Customer Queries
-export function useListCustomers() {
+export function useGetCustomers() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
+  const { shouldPoll } = usePolling();
 
   return useQuery<Customer[]>({
     queryKey: ['customers'],
@@ -334,27 +282,15 @@ export function useListCustomers() {
       if (!actor) return [];
       return actor.listCustomers();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'customers'),
-    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'customers')) ? DASHBOARD_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
-  });
-}
-
-export function useGetCustomer(customerId: bigint | null) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<Customer | null>({
-    queryKey: ['customer', customerId?.toString()],
-    queryFn: async () => {
-      if (!actor || customerId === null) return null;
-      return actor.getCustomer(customerId);
-    },
-    enabled: !!actor && !isFetching && customerId !== null,
+    enabled: !!actor && !isFetching,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 180000,
+    refetchInterval: shouldPoll ? DASHBOARD_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
   });
 }
+
+// Alias for backward compatibility
+export const useListCustomers = useGetCustomers;
 
 export function useCreateCustomer() {
   const { actor } = useActor();
@@ -367,7 +303,7 @@ export function useCreateCustomer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
@@ -383,16 +319,49 @@ export function useDeleteCustomer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+// Inventory Queries
+export function useListInventory() {
+  const { actor, isFetching } = useActor();
+  const { shouldPoll } = usePolling();
+
+  return useQuery<InventoryRecord[]>({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listInventory();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
+    refetchInterval: shouldPoll ? INVENTORY_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useAddInventoryEntry() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (entry: { productId: bigint; quantity: bigint; batch: string; supplierId: bigint }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.addInventoryEntry(entry.productId, entry.quantity, entry.batch, entry.supplierId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
 
 // Order Queries
-export function useListOrders() {
+export function useGetOrders() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
+  const { shouldPoll } = usePolling();
 
   return useQuery<OrderRecord[]>({
     queryKey: ['orders'],
@@ -400,27 +369,15 @@ export function useListOrders() {
       if (!actor) return [];
       return actor.listOrders();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'orders' || polling.activeModule === 'analytics'),
-    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'orders' || polling.activeModule === 'analytics')) ? ORDER_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
-  });
-}
-
-export function useGetOrder(orderId: bigint | null) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<OrderRecord | null>({
-    queryKey: ['order', orderId?.toString()],
-    queryFn: async () => {
-      if (!actor || orderId === null) return null;
-      return actor.getOrder(orderId);
-    },
-    enabled: !!actor && !isFetching && orderId !== null,
+    enabled: !!actor && !isFetching,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 180000,
+    refetchInterval: shouldPoll ? ORDER_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
   });
 }
+
+// Alias for backward compatibility
+export const useListOrders = useGetOrders;
 
 export function useCreateOrder() {
   const { actor } = useActor();
@@ -433,7 +390,8 @@ export function useCreateOrder() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
 }
@@ -449,15 +407,15 @@ export function useDeleteAllOrders() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
 
-// Product/Inventory Queries
-export function useListProducts() {
+// Product Queries
+export function useGetProducts() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
+  const { shouldPoll } = usePolling();
 
   return useQuery<Product[]>({
     queryKey: ['products'],
@@ -465,27 +423,15 @@ export function useListProducts() {
       if (!actor) return [];
       return actor.listProducts();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'inventory' || polling.activeModule === 'barcode' || polling.activeModule === 'invoice' || polling.activeModule === 'reports'),
-    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'inventory' || polling.activeModule === 'barcode' || polling.activeModule === 'invoice' || polling.activeModule === 'reports')) ? INVENTORY_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
-  });
-}
-
-export function useGetProduct(productId: bigint | null) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<Product | null>({
-    queryKey: ['product', productId?.toString()],
-    queryFn: async () => {
-      if (!actor || productId === null) return null;
-      return actor.getProduct(productId);
-    },
-    enabled: !!actor && !isFetching && productId !== null,
+    enabled: !!actor && !isFetching,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 180000,
+    refetchInterval: shouldPoll ? INVENTORY_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
   });
 }
+
+// Alias for backward compatibility
+export const useListProducts = useGetProducts;
 
 export function useAddProduct() {
   const { actor } = useActor();
@@ -520,7 +466,7 @@ export function useAddProduct() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
@@ -560,7 +506,6 @@ export function useUpdateProduct() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
   });
 }
@@ -577,33 +522,15 @@ export function useDeleteAllInventory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
-  });
-}
-
-// Inventory Records
-export function useListInventory() {
-  const { actor, isFetching } = useActor();
-  const polling = usePolling();
-
-  return useQuery<InventoryRecord[]>({
-    queryKey: ['inventory'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listInventory();
-    },
-    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'inventory' || polling.activeModule === 'analytics' || polling.activeModule === 'reports'),
-    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'inventory' || polling.activeModule === 'analytics' || polling.activeModule === 'reports')) ? INVENTORY_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
   });
 }
 
 // Invoice Queries
-export function useListInvoices() {
+export function useGetInvoices() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
+  const { shouldPoll } = usePolling();
 
   return useQuery<Invoice[]>({
     queryKey: ['invoices'],
@@ -611,12 +538,15 @@ export function useListInvoices() {
       if (!actor) return [];
       return actor.listInvoices();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'invoice' || polling.activeModule === 'invoiceHistory'),
-    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'invoice' || polling.activeModule === 'invoiceHistory')) ? INVOICE_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
+    refetchInterval: shouldPoll ? INVOICE_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
   });
 }
+
+// Alias for backward compatibility
+export const useListInvoices = useGetInvoices;
 
 export function useGetInvoice(invoiceId: bigint | null) {
   const { actor, isFetching } = useActor();
@@ -624,12 +554,11 @@ export function useGetInvoice(invoiceId: bigint | null) {
   return useQuery<Invoice | null>({
     queryKey: ['invoice', invoiceId?.toString()],
     queryFn: async () => {
-      if (!actor || invoiceId === null) return null;
+      if (!actor || !invoiceId) return null;
       return actor.getInvoice(invoiceId);
     },
     enabled: !!actor && !isFetching && invoiceId !== null,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 180000,
   });
 }
 
@@ -660,7 +589,6 @@ export function useCreateInvoice() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
   });
 }
@@ -677,15 +605,30 @@ export function useStockAdjustInvoice() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+export function useClearAllInvoices() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.clearAllInvoices();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
   });
 }
 
 // Notification Queries
-export function useListNotifications() {
+export function useGetNotifications() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
+  const { shouldPoll } = usePolling();
 
   return useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -693,12 +636,15 @@ export function useListNotifications() {
       if (!actor) return [];
       return actor.listNotifications();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'notifications'),
-    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'dashboard' || polling.activeModule === 'notifications')) ? NOTIFICATION_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching,
     staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
+    refetchInterval: shouldPoll ? NOTIFICATION_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
   });
 }
+
+// Alias for backward compatibility
+export const useListNotifications = useGetNotifications;
 
 export function useMarkNotificationAsRead() {
   const { actor } = useActor();
@@ -711,36 +657,34 @@ export function useMarkNotificationAsRead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
   });
 }
 
-// Dashboard Metrics (alias for getStats)
-export function useDashboardMetrics() {
+// Stats Queries
+export function useGetStats() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
+  const { shouldPoll } = usePolling();
 
   return useQuery<Stats>({
-    queryKey: ['dashboardMetrics'],
+    queryKey: ['stats'],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
       return actor.getStats();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'dashboard',
-    refetchInterval: (polling.shouldPoll && polling.activeModule === 'dashboard') ? DASHBOARD_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
+    refetchInterval: shouldPoll ? DASHBOARD_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
   });
 }
 
-// Alias for backward compatibility
-export const useGetStats = useDashboardMetrics;
+// Alias for dashboard metrics
+export const useDashboardMetrics = useGetStats;
 
 // Data Entry Queries
 export function useListDataEntries() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
 
   return useQuery<DataEntry[]>({
     queryKey: ['dataEntries'],
@@ -748,17 +692,14 @@ export function useListDataEntries() {
       if (!actor) return [];
       return actor.listDataEntries();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && (polling.activeModule === 'analytics' || polling.activeModule === 'reports'),
-    refetchInterval: (polling.shouldPoll && (polling.activeModule === 'analytics' || polling.activeModule === 'reports')) ? DASHBOARD_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
   });
 }
 
 // Profit & Loss Report
 export function useGetProfitLossReport(startDate: Time, endDate: Time) {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
 
   return useQuery<ProfitLossReport>({
     queryKey: ['profitLossReport', startDate.toString(), endDate.toString()],
@@ -766,27 +707,52 @@ export function useGetProfitLossReport(startDate: Time, endDate: Time) {
       if (!actor) throw new Error('Actor not available');
       return actor.getProfitLossReport(startDate, endDate);
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'reports',
-    refetchInterval: (polling.shouldPoll && polling.activeModule === 'reports') ? DASHBOARD_REFRESH_INTERVAL : false,
+    enabled: !!actor && !isFetching && !!startDate && !!endDate,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 180000,
   });
 }
 
-// User Account Queries
-export function useGetAllUserAccounts() {
+// Secondary Admin Email Management
+export function useListSecondaryAdminEmails() {
   const { actor, isFetching } = useActor();
-  const polling = usePolling();
 
-  return useQuery({
-    queryKey: ['userAccounts'],
+  return useQuery<string[]>({
+    queryKey: ['secondaryAdminEmails'],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getAllUserAccounts();
+      return actor.listSecondaryAdminEmails();
     },
-    enabled: !!actor && !isFetching && polling.shouldPoll && polling.activeModule === 'users',
-    refetchInterval: (polling.shouldPoll && polling.activeModule === 'users') ? NOTIFICATION_REFRESH_INTERVAL : false,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 180000,
+    enabled: !!actor && !isFetching,
+    staleTime: LONG_STALE_TIME,
+  });
+}
+
+export function useAddSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.addSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+    },
+  });
+}
+
+export function useRemoveSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.removeSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+    },
   });
 }
