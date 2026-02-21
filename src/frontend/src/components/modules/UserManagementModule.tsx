@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { useGetAllUserAccounts, useSetApproval, useAssignAppRole } from '../../hooks/useQueries';
+import { useGetAllUserAccounts, useApproveUser, useRejectUser, useAssignAppRole, useRemoveUser } from '../../hooks/useQueries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, CheckCircle2, XCircle, Clock, Shield, AlertTriangle } from 'lucide-react';
+import { Users, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import { UserProfile, AppRole, UserApprovalStatus } from '../../backend';
-import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { parseApprovalError } from '../../utils/approvalErrors';
+import { useInternetIdentity } from '../../hooks/useInternetIdentity';
 
 interface UserManagementModuleProps {
   userProfile: UserProfile;
@@ -19,8 +19,12 @@ interface UserManagementModuleProps {
 }
 
 export default function UserManagementModule({ userProfile, isAdmin, canAccessUserManagement }: UserManagementModuleProps) {
-  const { data: userAccounts = [], isLoading } = useGetAllUserAccounts();
-  const setApproval = useSetApproval();
+  const { identity } = useInternetIdentity();
+  // Only fetch user accounts if user has access
+  const { data: userAccounts = [], isLoading, error } = useGetAllUserAccounts(canAccessUserManagement);
+  const approveUser = useApproveUser();
+  const rejectUser = useRejectUser();
+  const removeUser = useRemoveUser();
   const assignAppRole = useAssignAppRole();
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole | null>(null);
@@ -52,21 +56,30 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
     );
   }
 
-  const handleApproval = async (userId: string, status: UserApprovalStatus) => {
+  const handleApprove = async (userId: any) => {
     try {
-      await setApproval.mutateAsync({
-        user: { toText: () => userId } as any,
-        status,
-      });
-      
-      const statusText = status === UserApprovalStatus.approved ? 'approved' : 
-                        status === UserApprovalStatus.rejected ? 'rejected' : 'set to pending';
-      toast.success(`User ${statusText} successfully!`);
+      await approveUser.mutateAsync(userId);
     } catch (error: any) {
-      // Parse the error and show user-friendly message
-      const errorInfo = parseApprovalError(error);
-      toast.error(errorInfo.message);
-      console.error('Approval error:', errorInfo);
+      // Error handling is done in the mutation hook
+      console.error('Approval error:', error);
+    }
+  };
+
+  const handleReject = async (userId: any) => {
+    try {
+      await rejectUser.mutateAsync(userId);
+    } catch (error: any) {
+      // Error handling is done in the mutation hook
+      console.error('Rejection error:', error);
+    }
+  };
+
+  const handleRemove = async (userId: any) => {
+    try {
+      await removeUser.mutateAsync(userId);
+    } catch (error: any) {
+      // Error handling is done in the mutation hook
+      console.error('Remove user error:', error);
     }
   };
 
@@ -78,14 +91,17 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
         user: selectedUser.id,
         role: selectedRole,
       });
-      toast.success('User role updated successfully!');
       setSelectedUser(null);
       setSelectedRole(null);
     } catch (error: any) {
       const errorInfo = parseApprovalError(error);
-      toast.error(errorInfo.message);
       console.error('Role assignment error:', errorInfo);
     }
+  };
+
+  const isCurrentUser = (userId: any): boolean => {
+    if (!identity) return false;
+    return userId.toString() === identity.getPrincipal().toString();
   };
 
   const getStatusBadge = (status: UserApprovalStatus) => {
@@ -138,6 +154,33 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
     );
   };
 
+  // Handle error state gracefully
+  if (error) {
+    const errorInfo = parseApprovalError(error);
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-8 w-8" />
+              Error Loading Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              {errorInfo.message}
+            </p>
+            {errorInfo.type === 'authorization' && (
+              <p className="text-sm text-muted-foreground">
+                This feature is restricted to primary system administrators only.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -181,80 +224,170 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {userAccounts.map((account) => (
-                    <TableRow key={account.id.toText()}>
-                      <TableCell className="font-medium">{account.profile.name}</TableCell>
-                      <TableCell>{account.profile.email}</TableCell>
-                      <TableCell>{account.profile.department}</TableCell>
-                      <TableCell>{getRoleBadge(account.profile.appRole)}</TableCell>
-                      <TableCell>{getStatusBadge(account.approvalStatus)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {account.approvalStatus === UserApprovalStatus.pending && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => handleApproval(account.id.toText(), UserApprovalStatus.approved)}
-                                disabled={setApproval.isPending}
-                              >
-                                {setApproval.isPending ? 'Processing...' : 'Approve'}
-                              </Button>
+                  {userAccounts.map((account) => {
+                    const isSelf = isCurrentUser(account.id);
+                    return (
+                      <TableRow key={account.id.toText()}>
+                        <TableCell className="font-medium">
+                          {account.profile.name}
+                          {isSelf && <span className="ml-2 text-xs text-muted-foreground">(You)</span>}
+                        </TableCell>
+                        <TableCell>{account.profile.email}</TableCell>
+                        <TableCell>{account.profile.department}</TableCell>
+                        <TableCell>{getRoleBadge(account.profile.appRole)}</TableCell>
+                        <TableCell>{getStatusBadge(account.approvalStatus)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {account.approvalStatus === UserApprovalStatus.pending && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => handleApprove(account.id)}
+                                  disabled={approveUser.isPending || rejectUser.isPending}
+                                >
+                                  {approveUser.isPending ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      Approving...
+                                    </>
+                                  ) : (
+                                    'Approve'
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleReject(account.id)}
+                                  disabled={approveUser.isPending || rejectUser.isPending}
+                                >
+                                  {rejectUser.isPending ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      Rejecting...
+                                    </>
+                                  ) : (
+                                    'Reject'
+                                  )}
+                                </Button>
+                              </>
+                            )}
+                            {account.approvalStatus === UserApprovalStatus.approved && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="destructive" disabled={rejectUser.isPending}>
+                                    Reject
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="flex items-center gap-2">
+                                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                                      Reject Approved User
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to reject {account.profile.name}? This will revoke their access to the system and they will need to request approval again.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleReject(account.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      disabled={rejectUser.isPending}
+                                    >
+                                      {rejectUser.isPending ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                          Rejecting...
+                                        </>
+                                      ) : (
+                                        'Reject User'
+                                      )}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedUser(account);
+                                setSelectedRole(account.profile.appRole);
+                              }}
+                              disabled={approveUser.isPending || rejectUser.isPending || assignAppRole.isPending}
+                            >
+                              Change Role
+                            </Button>
+                            {isSelf ? (
                               <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => handleApproval(account.id.toText(), UserApprovalStatus.rejected)}
-                                disabled={setApproval.isPending}
+                                disabled
+                                title="You cannot remove your own account"
                               >
-                                {setApproval.isPending ? 'Processing...' : 'Reject'}
+                                <Trash2 className="h-3 w-3" />
                               </Button>
-                            </>
-                          )}
-                          {account.approvalStatus === UserApprovalStatus.approved && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive" disabled={setApproval.isPending}>
-                                  Reject
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-destructive" />
-                                    Reject Approved User
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to reject {account.profile.name}? This will revoke their access to the system and they will need to request approval again.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleApproval(account.id.toText(), UserApprovalStatus.rejected)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    disabled={setApproval.isPending}
+                            ) : (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={removeUser.isPending}
                                   >
-                                    {setApproval.isPending ? 'Processing...' : 'Reject User'}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedUser(account);
-                              setSelectedRole(account.profile.appRole);
-                            }}
-                            disabled={setApproval.isPending || assignAppRole.isPending}
-                          >
-                            Change Role
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="flex items-center gap-2">
+                                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                                      Remove User Permanently
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription className="space-y-2">
+                                      <p>
+                                        Are you sure you want to permanently remove <strong>{account.profile.name}</strong> ({account.profile.email})?
+                                      </p>
+                                      <p className="text-destructive font-semibold">
+                                        This action is irreversible and will permanently delete:
+                                      </p>
+                                      <ul className="list-disc list-inside text-sm space-y-1">
+                                        <li>User profile and account data</li>
+                                        <li>All associated permissions and roles</li>
+                                        <li>User's approval status and history</li>
+                                      </ul>
+                                      <p className="text-sm">
+                                        The user will be completely removed from the system and will need to create a new account to regain access.
+                                      </p>
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleRemove(account.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      disabled={removeUser.isPending}
+                                    >
+                                      {removeUser.isPending ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                          Removing...
+                                        </>
+                                      ) : (
+                                        'Remove User'
+                                      )}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -290,7 +423,14 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setSelectedUser(null)}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleRoleAssignment} disabled={!selectedRole || assignAppRole.isPending}>
-                {assignAppRole.isPending ? 'Updating...' : 'Update Role'}
+                {assignAppRole.isPending ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Role'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

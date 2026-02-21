@@ -1,14 +1,14 @@
-import Map "mo:core/Map";
-import Set "mo:core/Set";
-import Nat "mo:core/Nat";
-import Time "mo:core/Time";
-import Int "mo:core/Int";
 import Array "mo:core/Array";
-import Order "mo:core/Order";
-import Iter "mo:core/Iter";
 import List "mo:core/List";
-import Runtime "mo:core/Runtime";
+import Map "mo:core/Map";
 import Principal "mo:core/Principal";
+import Time "mo:core/Time";
+import Nat "mo:core/Nat";
+import Order "mo:core/Order";
+import Int "mo:core/Int";
+import Set "mo:core/Set";
+import Runtime "mo:core/Runtime";
+import Iter "mo:core/Iter";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 import UserApproval "user-approval/approval";
@@ -508,8 +508,8 @@ actor {
     };
   };
 
-  // RESTRICTED: Only primary admins can approve/reject users
-  public shared ({ caller }) func setApproval(user : Principal, status : UserApproval.ApprovalStatus) : async () {
+  // Renamed approveUser for better clarity
+  public shared ({ caller }) func approveUser(user : Principal) : async () {
     requirePrimaryAdmin(caller);
 
     switch (userProfiles.get(user)) {
@@ -519,30 +519,33 @@ actor {
       case (?_) {};
     };
 
-    switch (status) {
-      case (#rejected) {
-        if (previousRejectedUsers.contains(user)) {
-          Runtime.trap("User has already been rejected");
-        };
-        previousRejectedUsers.add(user);
-      };
-      case (#approved) {
-        if (previousRejectedUsers.contains(user)) {
-          previousRejectedUsers.remove(user);
-        };
-      };
-      case (_) {};
+    if (previousRejectedUsers.contains(user)) {
+      previousRejectedUsers.remove(user);
     };
 
-    UserApproval.setApproval(approvalState, user, status);
+    UserApproval.setApproval(approvalState, user, #approved);
 
     switch (userAccounts.get(user)) {
-      case (null) {};
+      case (null) {
+        switch (userProfiles.get(user)) {
+          case (null) {
+            Runtime.trap("User profile not found. User must complete profile setup first.");
+          };
+          case (?profile) {
+            let newAccount : UserAccount = {
+              id = user;
+              profile;
+              approvalStatus = #approved;
+            };
+            userAccounts.add(user, newAccount);
+          };
+        };
+      };
       case (?account) {
         let updatedAccount : UserAccount = {
           id = account.id;
           profile = account.profile;
-          approvalStatus = convertApprovalStatus(status);
+          approvalStatus = #approved;
         };
         userAccounts.add(user, updatedAccount);
       };
@@ -554,27 +557,62 @@ actor {
       case (null) { user.toText() };
     };
 
-    let userNotificationTitle = switch (status) {
-      case (#approved) { "Account Approved" };
-      case (#rejected) { "Account Rejected" };
-      case (#pending) { "Account Status Updated" };
+    ignore createNotificationInternal(user, "Account Approved", "Your account has been approved. You can now access the dashboard.");
+    ignore createNotificationInternal(caller, "User Status Updated", "You have approved user " # userName);
+  };
+
+  // Renamed rejectUser for better clarity
+  public shared ({ caller }) func rejectUser(user : Principal) : async () {
+    requirePrimaryAdmin(caller);
+
+    switch (userProfiles.get(user)) {
+      case (null) {
+        Runtime.trap("User profile not found. User must complete profile setup first.");
+      };
+      case (?_) {};
     };
 
-    let userNotificationMessage = switch (status) {
-      case (#approved) { "Your account has been approved. You can now access the dashboard." };
-      case (#rejected) { "Your account approval request has been rejected. Please contact an administrator." };
-      case (#pending) { "Your account status has been updated to pending." };
+    if (previousRejectedUsers.contains(user)) {
+      Runtime.trap("User has already been rejected");
+    };
+    previousRejectedUsers.add(user);
+
+    UserApproval.setApproval(approvalState, user, #rejected);
+
+    switch (userAccounts.get(user)) {
+      case (null) {
+        switch (userProfiles.get(user)) {
+          case (null) {
+            Runtime.trap("User profile not found. User must complete profile setup first.");
+          };
+          case (?profile) {
+            let newAccount : UserAccount = {
+              id = user;
+              profile;
+              approvalStatus = #rejected;
+            };
+            userAccounts.add(user, newAccount);
+          };
+        };
+      };
+      case (?account) {
+        let updatedAccount : UserAccount = {
+          id = account.id;
+          profile = account.profile;
+          approvalStatus = #rejected;
+        };
+        userAccounts.add(user, updatedAccount);
+      };
     };
 
-    ignore createNotificationInternal(user, userNotificationTitle, userNotificationMessage);
-
-    let adminNotificationMessage = switch (status) {
-      case (#approved) { "You have approved user " # userName };
-      case (#rejected) { "You have rejected user " # userName };
-      case (#pending) { "You have set user " # userName # " status to pending" };
+    let userProfileOpt = userProfiles.get(user);
+    let userName = switch (userProfileOpt) {
+      case (?profile) { profile.name };
+      case (null) { user.toText() };
     };
 
-    ignore createNotificationInternal(caller, "User Status Updated", adminNotificationMessage);
+    ignore createNotificationInternal(user, "Account Rejected", "Your account approval request has been rejected. Please contact an administrator.");
+    ignore createNotificationInternal(caller, "User Status Updated", "You have rejected user " # userName);
   };
 
   // RESTRICTED: Only primary admins can list approvals
@@ -728,6 +766,18 @@ actor {
     requirePrimaryAdmin(caller);
     if (previousRejectedUsers.contains(user)) {
       previousRejectedUsers.remove(user);
+    };
+  };
+
+  // Only primary admins can use the setApproval function
+  public shared ({ caller }) func setApproval(user : Principal, status : UserApproval.ApprovalStatus) : async () {
+    requirePrimaryAdmin(caller);
+    switch (status) {
+      case (#approved) { await approveUser(user) };
+      case (#rejected) { await rejectUser(user) };
+      case (#pending) {
+        Runtime.trap("Error: Only admins can request approval for a user");
+      };
     };
   };
 
@@ -1228,7 +1278,6 @@ actor {
           case (?searchQuery) {
             inv.invoiceId.toText().contains(#text searchQuery);
           };
-          case (_) { true };
         };
 
         matchesCustomer and matchesDateRange and matchesStatus and matchesSearch;
@@ -1511,5 +1560,22 @@ actor {
       netProfit;
       reportDateRange;
     };
+  };
+
+  // Permanently remove user account (Only primary admins and not self)
+  public shared ({ caller }) func permanentlyRemoveUserAccount(targetUser : Principal) : async () {
+    requirePrimaryAdmin(caller);
+
+    if (caller == targetUser) {
+      Runtime.trap("Security Protection: You cannot delete your own super admin account.");
+    };
+
+    userProfiles.remove(targetUser);
+    userAppRoles.remove(targetUser);
+    userAccounts.remove(targetUser);
+    userSignatures.remove(targetUser);
+    previousRejectedUsers.remove(targetUser);
+
+    UserApproval.setApproval(approvalState, targetUser, #rejected);
   };
 };

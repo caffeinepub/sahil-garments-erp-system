@@ -217,6 +217,7 @@ export interface _SERVICE {
   >,
   'addProductImage' : ActorMethod<[bigint, ExternalBlob], undefined>,
   'addSecondaryAdminEmail' : ActorMethod<[string], undefined>,
+  'approveUser' : ActorMethod<[Principal], undefined>,
   'assignAppRole' : ActorMethod<[Principal, AppRole], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'batchExportBarcodes' : ActorMethod<
@@ -281,7 +282,9 @@ export interface _SERVICE {
   'listProducts' : ActorMethod<[], Array<Product>>,
   'listSecondaryAdminEmails' : ActorMethod<[], Array<string>>,
   'markNotificationAsRead' : ActorMethod<[bigint], boolean>,
+  'permanentlyRemoveUserAccount' : ActorMethod<[Principal], undefined>,
   'processPreviouslyRejectedUser' : ActorMethod<[Principal], undefined>,
+  'rejectUser' : ActorMethod<[Principal], undefined>,
   'removeSecondaryAdminEmail' : ActorMethod<[string], undefined>,
   'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,

@@ -1,50 +1,54 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T10:07:58.478Z",
+  "generatedAt": "2026-02-21T07:54:34.450Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 2,
+    "total": 4,
+    "implemented": 3,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Ensure the backend always persists a consistent UserAccount approval status when an admin approves/rejects a user, including creating a UserAccount record if one does not already exist (using the existing saved UserProfile for that principal).",
+        "summary": "Add a backend method in the main actor to allow primary admins to permanently remove user accounts from the system by principal ID",
         "status": "unknown",
         "plannedFiles": [],
         "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
+        "summary": "Add a 'Remove User' button to each user row in the UserManagementModule table that triggers a confirmation dialog before deletion",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/utils/approvalErrors.ts",
           "frontend/src/components/modules/UserManagementModule.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/components/ui/alert-dialog.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/utils/approvalErrors.ts",
-          "frontend/src/components/modules/UserManagementModule.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/components/modules/UserManagementModule.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
+        "summary": "Create a React Query mutation hook for removing users that calls the backend removal method and invalidates relevant queries on success",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/ApprovalPending.tsx",
-          "frontend/src/App.tsx"
+          "frontend/src/hooks/useQueries.ts"
         ],
         "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/ApprovalPending.tsx",
-          "frontend/src/App.tsx"
+          "frontend/src/hooks/useQueries.ts"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Prevent users from removing themselves to avoid accidentally locking themselves out of the admin panel",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/modules/UserManagementModule.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/modules/UserManagementModule.tsx"
         ]
       }
     ]
@@ -55,11 +59,12 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/App.tsx",
-    "frontend/src/components/ApprovalPending.tsx",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
     "frontend/src/components/modules/UserManagementModule.tsx",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/utils/approvalErrors.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

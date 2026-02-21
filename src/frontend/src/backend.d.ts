@@ -193,6 +193,7 @@ export interface backendInterface {
     addProduct(name: string, description: string, price: bigint, stockLevel: bigint, warehouse: string, rack: string, shelf: string, size: string, color: string, barcode: string): Promise<bigint>;
     addProductImage(productId: bigint, blob: ExternalBlob): Promise<void>;
     addSecondaryAdminEmail(email: string): Promise<void>;
+    approveUser(user: Principal): Promise<void>;
     assignAppRole(user: Principal, role: AppRole): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     batchExportBarcodes(arg0: BarcodeBatchExportRequest): Promise<ExternalBlob>;
@@ -245,7 +246,9 @@ export interface backendInterface {
     listProducts(): Promise<Array<Product>>;
     listSecondaryAdminEmails(): Promise<Array<string>>;
     markNotificationAsRead(notificationId: bigint): Promise<boolean>;
+    permanentlyRemoveUserAccount(targetUser: Principal): Promise<void>;
     processPreviouslyRejectedUser(user: Principal): Promise<void>;
+    rejectUser(user: Principal): Promise<void>;
     removeSecondaryAdminEmail(email: string): Promise<void>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;

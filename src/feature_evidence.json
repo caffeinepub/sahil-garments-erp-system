@@ -2,12 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-frontend-user-management-module-so-the-users-list-automatically-refreshes-after-approve-reject-actions-and-reflects-status-changes-without-a-manual-page-refresh-including-robust-error-messaging-based-on-backend-errors",
-      "featureTitle": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
+      "featureId": "feature-add-a-remove-user-button-to-each-user-row-in-the-usermanagementmodule-table-that-triggers-a-confirmation-dialog-before-deletion",
+      "featureTitle": "Add a 'Remove User' button to each user row in the UserManagementModule table that triggers a confirmation dialog before deletion",
       "files": [
-        "frontend/src/components/modules/UserManagementModule.tsx",
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/utils/approvalErrors.ts"
+        "frontend/src/components/modules/UserManagementModule.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -28,11 +26,9 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-update-the-frontend-approval-gating-experience-so-pending-users-automatically-re-check-approval-status-and-transition-appropriately-redirect-to-the-dashboard-when-approved-and-show-a-clear-rejected-state-screen-message-when-rejected",
-      "featureTitle": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
+      "featureId": "feature-create-a-react-query-mutation-hook-for-removing-users-that-calls-the-backend-removal-method-and-invalidates-relevant-queries-on-success",
+      "featureTitle": "Create a React Query mutation hook for removing users that calls the backend removal method and invalidates relevant queries on success",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/components/ApprovalPending.tsx",
         "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
@@ -50,6 +46,30 @@
       ],
       "testIds": [
         "REQ-3"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-prevent-users-from-removing-themselves-to-avoid-accidentally-locking-themselves-out-of-the-admin-panel",
+      "featureTitle": "Prevent users from removing themselves to avoid accidentally locking themselves out of the admin panel",
+      "files": [
+        "frontend/src/components/modules/UserManagementModule.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "qr-code@1.0.0",
+        "http-outcalls@3.0.0",
+        "user-approval@3.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-4"
       ],
       "confidence": "high"
     }

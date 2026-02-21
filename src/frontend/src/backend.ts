@@ -286,6 +286,7 @@ export interface backendInterface {
     addProduct(name: string, description: string, price: bigint, stockLevel: bigint, warehouse: string, rack: string, shelf: string, size: string, color: string, barcode: string): Promise<bigint>;
     addProductImage(productId: bigint, blob: ExternalBlob): Promise<void>;
     addSecondaryAdminEmail(email: string): Promise<void>;
+    approveUser(user: Principal): Promise<void>;
     assignAppRole(user: Principal, role: AppRole): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     batchExportBarcodes(arg0: BarcodeBatchExportRequest): Promise<ExternalBlob>;
@@ -338,7 +339,9 @@ export interface backendInterface {
     listProducts(): Promise<Array<Product>>;
     listSecondaryAdminEmails(): Promise<Array<string>>;
     markNotificationAsRead(notificationId: bigint): Promise<boolean>;
+    permanentlyRemoveUserAccount(targetUser: Principal): Promise<void>;
     processPreviouslyRejectedUser(user: Principal): Promise<void>;
+    rejectUser(user: Principal): Promise<void>;
     removeSecondaryAdminEmail(email: string): Promise<void>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
@@ -503,6 +506,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.addSecondaryAdminEmail(arg0);
+            return result;
+        }
+    }
+    async approveUser(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.approveUser(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.approveUser(arg0);
             return result;
         }
     }
@@ -1234,6 +1251,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async permanentlyRemoveUserAccount(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.permanentlyRemoveUserAccount(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.permanentlyRemoveUserAccount(arg0);
+            return result;
+        }
+    }
     async processPreviouslyRejectedUser(arg0: Principal): Promise<void> {
         if (this.processError) {
             try {
@@ -1245,6 +1276,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.processPreviouslyRejectedUser(arg0);
+            return result;
+        }
+    }
+    async rejectUser(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.rejectUser(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.rejectUser(arg0);
             return result;
         }
     }

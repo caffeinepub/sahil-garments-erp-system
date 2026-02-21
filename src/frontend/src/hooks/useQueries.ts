@@ -4,6 +4,7 @@ import type { Customer, OrderRecord, InventoryRecord, DataEntry, Notification, S
 import { UserApprovalStatus, T as InvoiceStatus } from '../backend';
 import { Principal } from '@dfinity/principal';
 import { usePolling } from '../context/PollingContext';
+import { toast } from 'sonner';
 
 // Configurable refresh interval (in milliseconds)
 const DASHBOARD_REFRESH_INTERVAL = 10000; // 10 seconds for real-time sync
@@ -215,7 +216,7 @@ export function useRequestApproval() {
   });
 }
 
-export function useGetAllUserAccounts() {
+export function useGetAllUserAccounts(enabled = true) {
   const { actor, isFetching } = useActor();
 
   return useQuery({
@@ -224,9 +225,81 @@ export function useGetAllUserAccounts() {
       if (!actor) throw new Error('Actor not available');
       return actor.getAllUserAccounts();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && enabled,
     staleTime: SHORT_STALE_TIME,
     gcTime: 300000,
+    retry: false,
+  });
+}
+
+// Approve user mutation
+export function useApproveUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (user: Principal) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.approveUser(user);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      toast.success('User approved successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Approve user error:', error);
+      const errorMessage = error?.message || 'Failed to approve user';
+      toast.error(errorMessage);
+    },
+  });
+}
+
+// Reject user mutation
+export function useRejectUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (user: Principal) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.rejectUser(user);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      toast.success('User rejected successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Reject user error:', error);
+      const errorMessage = error?.message || 'Failed to reject user';
+      toast.error(errorMessage);
+    },
+  });
+}
+
+// Remove user mutation (permanent deletion)
+export function useRemoveUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (user: Principal) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.permanentlyRemoveUserAccount(user);
+    },
+    onSuccess: (_, user) => {
+      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      toast.success('User removed successfully');
+    },
+    onError: (error: any) => {
+      console.error('Remove user error:', error);
+      const errorMessage = error?.message || 'Failed to remove user';
+      toast.error(errorMessage);
+    },
   });
 }
 
@@ -238,19 +311,26 @@ export function useSetApproval() {
     mutationFn: async ({ user, status }: { user: Principal; status: UserApprovalStatus }) => {
       if (!actor) throw new Error('Actor not available');
       
-      // Convert UserApprovalStatus enum to backend ApprovalStatus
-      const backendStatus = status === UserApprovalStatus.approved 
-        ? { approved: null }
-        : status === UserApprovalStatus.rejected
-        ? { rejected: null }
-        : { pending: null };
+      // Convert UserApprovalStatus enum to backend ApprovalStatus variant
+      let backendStatus: any;
+      if (status === UserApprovalStatus.approved) {
+        backendStatus = { __kind__: 'approved' };
+      } else if (status === UserApprovalStatus.rejected) {
+        backendStatus = { __kind__: 'rejected' };
+      } else {
+        backendStatus = { __kind__: 'pending' };
+      }
       
-      return actor.setApproval(user, backendStatus as any);
+      return actor.setApproval(user, backendStatus);
     },
     onSuccess: () => {
       // Immediately invalidate and refetch user accounts list
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+    },
+    onError: (error) => {
+      console.error('Set approval mutation error:', error);
     },
   });
 }
@@ -267,6 +347,52 @@ export function useAssignAppRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
       queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+    },
+  });
+}
+
+// Secondary Admin Email Management
+export function useListSecondaryAdminEmails() {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<string[]>({
+    queryKey: ['secondaryAdminEmails'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.listSecondaryAdminEmails();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: LONG_STALE_TIME,
+    gcTime: 300000,
+  });
+}
+
+export function useAddSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.addSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+    },
+  });
+}
+
+export function useRemoveSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.removeSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
     },
   });
 }
@@ -527,6 +653,20 @@ export function useDeleteAllInventory() {
   });
 }
 
+export function useGetProduct(productId: bigint | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<Product | null>({
+    queryKey: ['product', productId?.toString()],
+    queryFn: async () => {
+      if (!actor || !productId) return null;
+      return actor.getProduct(productId);
+    },
+    enabled: !!actor && !isFetching && productId !== null,
+    staleTime: MEDIUM_STALE_TIME,
+  });
+}
+
 // Invoice Queries
 export function useGetInvoices() {
   const { actor, isFetching } = useActor();
@@ -589,6 +729,7 @@ export function useCreateInvoice() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
@@ -610,6 +751,29 @@ export function useStockAdjustInvoice() {
   });
 }
 
+export function useUpdateInvoiceDocumentUrls() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      invoiceId,
+      imageUrl,
+      pdfUrl,
+    }: {
+      invoiceId: bigint;
+      imageUrl: string | null;
+      pdfUrl: string | null;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.updateInvoiceDocumentUrls(invoiceId, imageUrl, pdfUrl);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+}
+
 export function useClearAllInvoices() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -621,6 +785,7 @@ export function useClearAllInvoices() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
@@ -661,7 +826,7 @@ export function useMarkNotificationAsRead() {
   });
 }
 
-// Stats Queries
+// Stats Query (Dashboard Metrics)
 export function useGetStats() {
   const { actor, isFetching } = useActor();
   const { shouldPoll } = usePolling();
@@ -682,7 +847,7 @@ export function useGetStats() {
 // Alias for dashboard metrics
 export const useDashboardMetrics = useGetStats;
 
-// Data Entry Queries
+// Data Entries Queries
 export function useListDataEntries() {
   const { actor, isFetching } = useActor();
 
@@ -697,7 +862,27 @@ export function useListDataEntries() {
   });
 }
 
-// Profit & Loss Report
+export function useCreateDataEntry() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (entry: {
+      entityType: string;
+      entryId: bigint;
+      amount: bigint;
+      quantity: bigint;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.createDataEntry(entry.entityType, entry.entryId, entry.amount, entry.quantity);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dataEntries'] });
+    },
+  });
+}
+
+// Profit & Loss Report Query
 export function useGetProfitLossReport(startDate: Time, endDate: Time) {
   const { actor, isFetching } = useActor();
 
@@ -707,52 +892,7 @@ export function useGetProfitLossReport(startDate: Time, endDate: Time) {
       if (!actor) throw new Error('Actor not available');
       return actor.getProfitLossReport(startDate, endDate);
     },
-    enabled: !!actor && !isFetching && !!startDate && !!endDate,
-    staleTime: MEDIUM_STALE_TIME,
-  });
-}
-
-// Secondary Admin Email Management
-export function useListSecondaryAdminEmails() {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<string[]>({
-    queryKey: ['secondaryAdminEmails'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listSecondaryAdminEmails();
-    },
     enabled: !!actor && !isFetching,
-    staleTime: LONG_STALE_TIME,
-  });
-}
-
-export function useAddSecondaryAdminEmail() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (email: string) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addSecondaryAdminEmail(email);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
-    },
-  });
-}
-
-export function useRemoveSecondaryAdminEmail() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (email: string) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.removeSecondaryAdminEmail(email);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
-    },
+    staleTime: MEDIUM_STALE_TIME,
   });
 }

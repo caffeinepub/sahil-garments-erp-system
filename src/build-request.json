@@ -1,72 +1,83 @@
 {
   "kind": "build_request",
-  "title": "Update user management approve/reject workflow with automatic refresh",
+  "title": "Add user removal functionality to user management",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Ensure the backend always persists a consistent UserAccount approval status when an admin approves/rejects a user, including creating a UserAccount record if one does not already exist (using the existing saved UserProfile for that principal).",
+      "text": "Add a backend method in the main actor to allow primary admins to permanently remove user accounts from the system by principal ID",
       "target": "backend",
       "source": {
         "messageIds": [
-          "msg-10"
-        ],
-        "quotes": [
-          "user management reject and approved automatic refers please updated"
+          "msg-user-remove-request"
         ]
       },
       "acceptanceCriteria": [
-        "Calling the existing backend setApproval(user, status) results in userAccounts containing a record for that user principal with approvalStatus matching the requested status (approved/rejected/pending).",
-        "If the user has not completed profile setup (no UserProfile saved), setApproval continues to fail with a clear error (no silent creation of placeholder profiles).",
-        "After a successful setApproval call, getAllUserAccounts() reflects the updated status without requiring any other backend call/mutation."
+        "Method validates that the caller is a primary admin before allowing removal",
+        "Method accepts a principal ID and removes the corresponding user profile from state",
+        "Method returns success confirmation or appropriate error messages",
+        "Removed users cannot access the system after deletion"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
+      "text": "Add a 'Remove User' button to each user row in the UserManagementModule table that triggers a confirmation dialog before deletion",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-10"
-        ],
-        "quotes": [
-          "user management reject and approved automatic refers please updated"
+          "msg-user-remove-request"
         ]
       },
       "acceptanceCriteria": [
-        "After clicking Approve or Reject in UserManagementModule, the table row updates to the new status within one refresh cycle (via query invalidation and/or polling) and the action buttons update accordingly.",
-        "If setApproval fails due to authorization (non-primary admin / secondary admin), show an English toast error that includes the backend message when available.",
-        "If setApproval fails because the user has not completed profile setup, show an English toast error indicating the user must complete profile setup before approval can be changed."
+        "Remove button appears for each user in the management table",
+        "Button is styled with destructive/warning styling to indicate permanent action",
+        "Clicking the button opens a confirmation dialog explaining the action is irreversible",
+        "Confirmation dialog displays the user's name and email for verification",
+        "Only primary admins can see and use the remove button"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
+      "text": "Create a React Query mutation hook for removing users that calls the backend removal method and invalidates relevant queries on success",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-10"
-        ],
-        "quotes": [
-          "user management reject and approved automatic refers please updated"
+          "msg-user-remove-request"
         ]
       },
       "acceptanceCriteria": [
-        "While on the ApprovalPending screen, the app re-checks approval status periodically and automatically routes the user into the authenticated dashboard when approval becomes true (no manual reload required).",
-        "If the backend indicates the user has been rejected (e.g., via the existing rejection authorization error), show an English, user-friendly rejected message and provide a logout button that clears the Internet Identity session.",
-        "The periodic approval check stops once the user is approved and routed, or once the user logs out."
+        "Mutation hook handles loading, success, and error states",
+        "On successful removal, the user list query is invalidated and refetched",
+        "Success toast notification confirms user removal",
+        "Error toast displays if removal fails with appropriate error message"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Prevent users from removing themselves to avoid accidentally locking themselves out of the admin panel",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-user-remove-request"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Backend method rejects removal requests where the caller's principal matches the target user",
+        "Frontend hides or disables the remove button for the current user's own account",
+        "Attempting self-removal shows an error message explaining the restriction"
       ]
     }
   ],
   "constraints": [
-    "Backend must remain a single Motoko actor in backend/main.mo (no additional backend services).",
-    "Do not edit immutable frontend paths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui.",
-    "Use English for any user-facing text."
+    "Only primary admins can remove users (secondary admins must not have access)",
+    "User removal must be a permanent, irreversible action",
+    "The current logged-in admin cannot remove their own account"
   ],
   "nonGoals": [
-    "Do not implement a referral/affiliate program or referral codes unless explicitly specified with rules and data fields.",
-    "Do not add third-party authentication providers beyond Internet Identity.",
-    "Do not introduce external databases or services."
+    "Soft deletion or archiving of users (removal should be permanent)",
+    "Bulk user removal functionality",
+    "User suspension or temporary account deactivation",
+    "Restoring or recovering removed users"
   ],
   "imageRequirements": {
     "required": [],

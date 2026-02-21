@@ -1,24 +1,32 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Project to implement user management workflow with approve/reject actions and automatic referrals.",
+  "summary": "User management system with approve/reject and remove functionality",
   "architectural_notes": [],
   "known_issues": [],
   "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-update-the-frontend-user-management-module-so-the-users-list-automatically-refreshes-after-approve-reject-actions-and-reflects-status-changes-without-a-manual-page-refresh-including-robust-error-messaging-based-on-backend-errors",
-      "title": "Update the frontend User Management module so the users list automatically refreshes after approve/reject actions and reflects status changes without a manual page refresh, including robust error messaging based on backend errors.",
+      "id": "feature-add-a-remove-user-button-to-each-user-row-in-the-usermanagementmodule-table-that-triggers-a-confirmation-dialog-before-deletion",
+      "title": "Add a 'Remove User' button to each user row in the UserManagementModule table that triggers a confirmation dialog before deletion",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-update-the-frontend-approval-gating-experience-so-pending-users-automatically-re-check-approval-status-and-transition-appropriately-redirect-to-the-dashboard-when-approved-and-show-a-clear-rejected-state-screen-message-when-rejected",
-      "title": "Update the frontend approval gating experience so pending users automatically re-check approval status and transition appropriately: redirect to the dashboard when approved, and show a clear rejected-state screen/message when rejected.",
+      "id": "feature-create-a-react-query-mutation-hook-for-removing-users-that-calls-the-backend-removal-method-and-invalidates-relevant-queries-on-success",
+      "title": "Create a React Query mutation hook for removing users that calls the backend removal method and invalidates relevant queries on success",
       "reqIds": [
         "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-prevent-users-from-removing-themselves-to-avoid-accidentally-locking-themselves-out-of-the-admin-panel",
+      "title": "Prevent users from removing themselves to avoid accidentally locking themselves out of the admin panel",
+      "reqIds": [
+        "REQ-4"
       ],
       "version": 1
     }
@@ -26,20 +34,20 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Add user management workflow: approve/reject users and support automatic referrals",
+      "summary": "Add user remove option in user management",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Ensure the backend always persists a consistent UserAccount approval status when an admin approves/rejects a user, including creating a UserAccount record if one does not already exist (using the existing saved UserProfile for that principal).",
+      "summary": "Add a backend method in the main actor to allow primary admins to permanently remove user accounts from the system by principal ID",
       "reqIds": [
         "REQ-1"
       ],
       "status": "pending"
     }
   ],
-  "projectName": "Update user management approve/reject workflow with automatic refresh",
+  "projectName": "Add user removal functionality to user management",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

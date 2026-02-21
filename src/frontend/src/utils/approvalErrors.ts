@@ -21,7 +21,9 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('unauthorized') ||
     lowerMessage.includes('only primary') ||
     lowerMessage.includes('secondary admin') ||
-    lowerMessage.includes('primary admin privileges')
+    lowerMessage.includes('primary admin privileges') ||
+    lowerMessage.includes('only admins can') ||
+    lowerMessage.includes('permission')
   ) {
     return {
       type: 'authorization',
@@ -51,6 +53,18 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
     return {
       type: 'rejected',
       message: 'Your account has been rejected. Please contact an administrator for assistance.',
+      backendMessage: errorMessage,
+    };
+  }
+
+  // Check for actor/authentication errors
+  if (
+    lowerMessage.includes('actor not available') ||
+    lowerMessage.includes('authentication required')
+  ) {
+    return {
+      type: 'unknown',
+      message: 'Authentication error. Please try logging in again.',
       backendMessage: errorMessage,
     };
   }
