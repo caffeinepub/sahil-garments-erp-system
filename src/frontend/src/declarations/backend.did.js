@@ -64,26 +64,25 @@ export const BarcodeExportRequest = IDL.Record({
   'exportType' : BarcodeExportFormat,
   'productId' : IDL.Nat,
 });
-export const UserApprovalStatus = IDL.Variant({
-  'pending' : IDL.Null,
-  'approved' : IDL.Null,
-  'rejected' : IDL.Null,
-});
 export const UserProfile = IDL.Record({
   'appRole' : AppRole,
   'name' : IDL.Text,
   'email' : IDL.Text,
   'department' : IDL.Text,
 });
-export const UserAccount = IDL.Record({
-  'id' : IDL.Principal,
-  'approvalStatus' : UserApprovalStatus,
-  'profile' : UserProfile,
-});
 export const AppBootstrapState = IDL.Record({
   'isApproved' : IDL.Bool,
   'isAdmin' : IDL.Bool,
   'userProfile' : IDL.Opt(UserProfile),
+});
+export const SystemStatus = IDL.Variant({
+  'initialized' : IDL.Null,
+  'unknown' : IDL.Null,
+});
+export const BootstrapStatus = IDL.Record({
+  'canisterStatus' : IDL.Opt(SystemStatus),
+  'backendAvailable' : IDL.Bool,
+  'jsonSupport' : IDL.Bool,
 });
 export const Customer = IDL.Record({
   'id' : IDL.Nat,
@@ -301,8 +300,8 @@ export const idlService = IDL.Service({
       [],
     ),
   'exportProductBarcode' : IDL.Func([BarcodeExportRequest], [ExternalBlob], []),
-  'getAllUserAccounts' : IDL.Func([], [IDL.Vec(UserAccount)], []),
   'getBootstrapState' : IDL.Func([], [AppBootstrapState], ['query']),
+  'getBootstrapStatus' : IDL.Func([], [BootstrapStatus], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCustomer' : IDL.Func([IDL.Nat], [IDL.Opt(Customer)], ['query']),
@@ -448,26 +447,25 @@ export const idlFactory = ({ IDL }) => {
     'exportType' : BarcodeExportFormat,
     'productId' : IDL.Nat,
   });
-  const UserApprovalStatus = IDL.Variant({
-    'pending' : IDL.Null,
-    'approved' : IDL.Null,
-    'rejected' : IDL.Null,
-  });
   const UserProfile = IDL.Record({
     'appRole' : AppRole,
     'name' : IDL.Text,
     'email' : IDL.Text,
     'department' : IDL.Text,
   });
-  const UserAccount = IDL.Record({
-    'id' : IDL.Principal,
-    'approvalStatus' : UserApprovalStatus,
-    'profile' : UserProfile,
-  });
   const AppBootstrapState = IDL.Record({
     'isApproved' : IDL.Bool,
     'isAdmin' : IDL.Bool,
     'userProfile' : IDL.Opt(UserProfile),
+  });
+  const SystemStatus = IDL.Variant({
+    'initialized' : IDL.Null,
+    'unknown' : IDL.Null,
+  });
+  const BootstrapStatus = IDL.Record({
+    'canisterStatus' : IDL.Opt(SystemStatus),
+    'backendAvailable' : IDL.Bool,
+    'jsonSupport' : IDL.Bool,
   });
   const Customer = IDL.Record({
     'id' : IDL.Nat,
@@ -689,8 +687,8 @@ export const idlFactory = ({ IDL }) => {
         [ExternalBlob],
         [],
       ),
-    'getAllUserAccounts' : IDL.Func([], [IDL.Vec(UserAccount)], []),
     'getBootstrapState' : IDL.Func([], [AppBootstrapState], ['query']),
+    'getBootstrapStatus' : IDL.Func([], [BootstrapStatus], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCustomer' : IDL.Func([IDL.Nat], [IDL.Opt(Customer)], ['query']),

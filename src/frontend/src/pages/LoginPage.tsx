@@ -1,33 +1,43 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LogIn, Loader2 } from 'lucide-react';
+import { Loader2, LogIn, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function LoginPage() {
   const { login, loginStatus, identity } = useInternetIdentity();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const isLoggingIn = loginStatus === 'logging-in';
-  const isAuthenticated = !!identity;
+  const isLoading = loginStatus === 'logging-in' || isLoggingIn;
 
   useEffect(() => {
-    if (isAuthenticated) {
-      // User is already authenticated, no need to show login page
-      return;
+    if (loginStatus === 'loginError') {
+      setError('Login failed. Please try again.');
+      setIsLoggingIn(false);
+    } else if (loginStatus === 'success' && identity) {
+      setIsLoggingIn(false);
     }
-  }, [isAuthenticated]);
+  }, [loginStatus, identity]);
 
   const handleLogin = async () => {
     try {
+      setError(null);
+      setIsLoggingIn(true);
+      console.log('[LoginPage] Starting login...');
       await login();
-    } catch (error) {
-      console.error('Login error:', error);
+      console.log('[LoginPage] Login completed');
+    } catch (err: any) {
+      console.error('[LoginPage] Login error:', err);
+      setError(err?.message || 'Failed to login. Please try again.');
+      setIsLoggingIn(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4">
-      <Card className="w-full max-w-md shadow-2xl">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
             <img 
@@ -37,26 +47,35 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold">Sahil Garments</CardTitle>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Sahil Garments
+            </CardTitle>
             <CardDescription className="text-base mt-2">
-              ERP Management System
+              Enterprise Resource Planning System
             </CardDescription>
           </div>
         </CardHeader>
-        
-        <CardContent className="space-y-6">
-          <div className="text-center space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Login with your Internet Identity to continue
+        <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground text-center">
+              Sign in with Internet Identity to access your workspace
             </p>
           </div>
 
           <Button
             onClick={handleLogin}
-            disabled={isLoggingIn}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 h-12 text-base"
+            disabled={isLoading}
+            className="w-full"
+            size="lg"
           >
-            {isLoggingIn ? (
+            {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 Logging in...
@@ -69,9 +88,9 @@ export default function LoginPage() {
             )}
           </Button>
 
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">
-              Secure and decentralized authentication
+          <div className="pt-4 border-t">
+            <p className="text-xs text-center text-muted-foreground">
+              Secure authentication powered by Internet Computer
             </p>
           </div>
         </CardContent>

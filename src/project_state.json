@@ -4,46 +4,38 @@
   "summary": "New project",
   "architectural_notes": [],
   "known_issues": [
-    "Administrator not receiving approval requests"
+    "App not opening properly after Version 49 deployment"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-ensure-usermanagementmodule-correctly-fetches-and-displays-pending-approval-requests-for-administrators",
-      "title": "Ensure UserManagementModule correctly fetches and displays pending approval requests for administrators",
+      "id": "feature-investigate-and-fix-the-application-initialization-failure-that-prevents-the-app-from-opening-properly-after-version-49-deployment-check-for-runtime-errors-in-app-tsx-bootstrap-flow-authentication-state-handling-and-any-breaking-changes-in-the-recent-profile-save-fix",
+      "title": "Investigate and fix the application initialization failure that prevents the app from opening properly after Version 49 deployment. Check for runtime errors in App.tsx bootstrap flow, authentication state handling, and any breaking changes in the recent profile save fix.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-comprehensive-error-boundaries-and-loading-state-handling-to-catch-and-display-any-initialization-failures-gracefully-showing-user-friendly-error-messages-instead-of-blank-screens",
+      "title": "Add comprehensive error boundaries and loading state handling to catch and display any initialization failures gracefully, showing user-friendly error messages instead of blank screens.",
       "reqIds": [
         "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-add-comprehensive-debug-logging-to-track-the-full-approval-request-lifecycle-from-submission-through-administrator-retrieval",
-      "title": "Add comprehensive debug logging to track the full approval request lifecycle from submission through administrator retrieval",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-verify-role-based-access-control-allows-administrators-to-access-usermanagementmodule-and-view-pending-approval-requests",
-      "title": "Verify role-based access control allows administrators to access UserManagementModule and view pending approval requests",
-      "reqIds": [
-        "REQ-4"
       ],
       "version": 1
     }
   ],
   "new_feature_requests": [
     {
-      "id": "AR-1",
-      "summary": "Verify that the backend submitApprovalRequest method correctly creates approval records in the system state when ProfileSetup component submits a request",
+      "id": "AR-3",
+      "summary": "Verify backend actor initialization and canister availability to ensure the app can successfully connect to the backend services.",
       "reqIds": [
-        "REQ-1"
+        "REQ-3"
       ],
       "status": "pending"
     }
   ],
-  "projectName": "Fix approval request flow - administrator not receiving requests",
+  "projectName": "Fix app initialization failure",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

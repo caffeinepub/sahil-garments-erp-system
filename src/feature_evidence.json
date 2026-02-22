@@ -2,11 +2,40 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-ensure-usermanagementmodule-correctly-fetches-and-displays-pending-approval-requests-for-administrators",
-      "featureTitle": "Ensure UserManagementModule correctly fetches and displays pending approval requests for administrators",
+      "featureId": "feature-investigate-and-fix-the-application-initialization-failure-that-prevents-the-app-from-opening-properly-after-version-49-deployment-check-for-runtime-errors-in-app-tsx-bootstrap-flow-authentication-state-handling-and-any-breaking-changes-in-the-recent-profile-save-fix",
+      "featureTitle": "Investigate and fix the application initialization failure that prevents the app from opening properly after Version 49 deployment. Check for runtime errors in App.tsx bootstrap flow, authentication state handling, and any breaking changes in the recent profile save fix.",
       "files": [
-        "frontend/src/components/modules/UserManagementModule.tsx",
+        "frontend/src/App.tsx",
+        "frontend/src/components/ApprovalPending.tsx",
+        "frontend/src/components/ProfileSetup.tsx",
         "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "qr-code@1.0.0",
+        "http-outcalls@3.0.0",
+        "user-approval@3.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-comprehensive-error-boundaries-and-loading-state-handling-to-catch-and-display-any-initialization-failures-gracefully-showing-user-friendly-error-messages-instead-of-blank-screens",
+      "featureTitle": "Add comprehensive error boundaries and loading state handling to catch and display any initialization failures gracefully, showing user-friendly error messages instead of blank screens.",
+      "files": [
+        "frontend/src/App.tsx",
+        "frontend/src/components/ErrorBoundary.tsx",
+        "frontend/src/components/InitializationError.tsx",
+        "frontend/src/pages/LoginPage.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -23,57 +52,6 @@
       ],
       "testIds": [
         "REQ-2"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-add-comprehensive-debug-logging-to-track-the-full-approval-request-lifecycle-from-submission-through-administrator-retrieval",
-      "featureTitle": "Add comprehensive debug logging to track the full approval request lifecycle from submission through administrator retrieval",
-      "files": [
-        "frontend/src/components/ProfileSetup.tsx",
-        "frontend/src/components/modules/UserManagementModule.tsx",
-        "frontend/src/hooks/useQueries.ts"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "blob-storage@4.0.0",
-        "camera@1.0.0",
-        "qr-code@1.0.0",
-        "http-outcalls@3.0.0",
-        "user-approval@3.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-3"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-verify-role-based-access-control-allows-administrators-to-access-usermanagementmodule-and-view-pending-approval-requests",
-      "featureTitle": "Verify role-based access control allows administrators to access UserManagementModule and view pending approval requests",
-      "files": [
-        "frontend/src/components/modules/UserManagementModule.tsx",
-        "frontend/src/hooks/useQueries.ts"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "blob-storage@4.0.0",
-        "camera@1.0.0",
-        "qr-code@1.0.0",
-        "http-outcalls@3.0.0",
-        "user-approval@3.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-4"
       ],
       "confidence": "high"
     }

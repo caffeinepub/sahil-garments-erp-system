@@ -13,8 +13,16 @@ export interface ApprovalErrorInfo {
  * Parse backend error and extract a user-friendly English message for approval operations
  */
 export function parseApprovalError(error: any): ApprovalErrorInfo {
+  console.group('[Error Parser] parseApprovalError');
+  console.log('[Error Parser] Input error:', error);
+  console.log('[Error Parser] Error type:', typeof error);
+  console.log('[Error Parser] Error message:', error?.message);
+  
   const errorMessage = error?.message || error?.toString() || '';
   const lowerMessage = errorMessage.toLowerCase();
+  
+  console.log('[Error Parser] Normalized message:', errorMessage);
+  console.log('[Error Parser] Lowercase message:', lowerMessage);
 
   // Check for network errors
   if (
@@ -23,6 +31,8 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('connection') ||
     lowerMessage.includes('timeout')
   ) {
+    console.log('[Error Parser] Detected: network error');
+    console.groupEnd();
     return {
       type: 'network',
       message: 'Network error. Please check your connection and try again.',
@@ -39,6 +49,8 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('only admins can') ||
     lowerMessage.includes('permission')
   ) {
+    console.log('[Error Parser] Detected: authorization error');
+    console.groupEnd();
     return {
       type: 'authorization',
       message: 'You do not have permission to perform this action. Only primary administrators can manage user approvals.',
@@ -52,6 +64,8 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('complete profile setup') ||
     lowerMessage.includes('user must complete profile')
   ) {
+    console.log('[Error Parser] Detected: missing profile');
+    console.groupEnd();
     return {
       type: 'missing-profile',
       message: 'This user must complete their profile setup before their approval status can be changed.',
@@ -64,6 +78,8 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('rejected') ||
     lowerMessage.includes('account has been rejected')
   ) {
+    console.log('[Error Parser] Detected: rejection error');
+    console.groupEnd();
     return {
       type: 'rejected',
       message: 'Your account has been rejected. Please contact an administrator for assistance.',
@@ -76,6 +92,8 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('actor not available') ||
     lowerMessage.includes('authentication required')
   ) {
+    console.log('[Error Parser] Detected: authentication error');
+    console.groupEnd();
     return {
       type: 'unknown',
       message: 'Authentication error. Please try logging in again.',
@@ -84,6 +102,8 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
   }
 
   // Unknown error
+  console.log('[Error Parser] Detected: unknown error');
+  console.groupEnd();
   return {
     type: 'unknown',
     message: errorMessage || 'An unexpected error occurred. Please try again.',
@@ -95,8 +115,18 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
  * Parse profile save errors with specific handling for role restrictions
  */
 export function parseProfileSaveError(error: any): ApprovalErrorInfo {
+  console.group('[Error Parser] parseProfileSaveError');
+  console.log('[Error Parser] Input error:', error);
+  console.log('[Error Parser] Error type:', typeof error);
+  console.log('[Error Parser] Error constructor:', error?.constructor?.name);
+  console.log('[Error Parser] Error message:', error?.message);
+  console.log('[Error Parser] Error toString:', error?.toString());
+  
   const errorMessage = error?.message || error?.toString() || '';
   const lowerMessage = errorMessage.toLowerCase();
+  
+  console.log('[Error Parser] Normalized message:', errorMessage);
+  console.log('[Error Parser] Lowercase message:', lowerMessage);
 
   // Check for network errors first
   if (
@@ -105,6 +135,8 @@ export function parseProfileSaveError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('connection') ||
     lowerMessage.includes('timeout')
   ) {
+    console.log('[Error Parser] Detected: network error');
+    console.groupEnd();
     return {
       type: 'network',
       message: 'Network error. Please check your connection and try again.',
@@ -118,8 +150,11 @@ export function parseProfileSaveError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('cannot self-assign privileged roles') ||
     lowerMessage.includes('cannot change app roles') ||
     lowerMessage.includes('only admins can assign') ||
-    lowerMessage.includes('only admins can change app roles')
+    lowerMessage.includes('only admins can change app roles') ||
+    lowerMessage.includes('request role assignment from an admin')
   ) {
+    console.log('[Error Parser] Detected: role restriction error');
+    console.groupEnd();
     return {
       type: 'role-restriction',
       message: 'You cannot assign privileged roles to yourself during profile creation. Please create your profile first, then contact an administrator to assign the appropriate role.',
@@ -133,6 +168,8 @@ export function parseProfileSaveError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('invalid') ||
     lowerMessage.includes('must provide')
   ) {
+    console.log('[Error Parser] Detected: validation error');
+    console.groupEnd();
     return {
       type: 'validation',
       message: errorMessage || 'Please fill in all required fields correctly.',
@@ -146,6 +183,8 @@ export function parseProfileSaveError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('permission') ||
     lowerMessage.includes('only users can')
   ) {
+    console.log('[Error Parser] Detected: authorization error');
+    console.groupEnd();
     return {
       type: 'authorization',
       message: 'You do not have permission to save this profile. Please ensure you are logged in.',
@@ -158,6 +197,8 @@ export function parseProfileSaveError(error: any): ApprovalErrorInfo {
     lowerMessage.includes('actor not available') ||
     lowerMessage.includes('authentication required')
   ) {
+    console.log('[Error Parser] Detected: authentication error');
+    console.groupEnd();
     return {
       type: 'unknown',
       message: 'Authentication error. Please try logging in again.',
@@ -167,6 +208,8 @@ export function parseProfileSaveError(error: any): ApprovalErrorInfo {
 
   // Return the actual backend error message if it's descriptive
   if (errorMessage && errorMessage.length > 10) {
+    console.log('[Error Parser] Using backend error message directly');
+    console.groupEnd();
     return {
       type: 'unknown',
       message: errorMessage,
@@ -175,6 +218,8 @@ export function parseProfileSaveError(error: any): ApprovalErrorInfo {
   }
 
   // Unknown error
+  console.log('[Error Parser] Detected: unknown error (no specific pattern matched)');
+  console.groupEnd();
   return {
     type: 'unknown',
     message: 'Failed to save profile. Please try again or contact support.',

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
 import type { Customer, OrderRecord, InventoryRecord, DataEntry, Notification, Stats, UserProfile, AppRole, InventoryLocation, UserApprovalInfo, Product, Invoice, Time, ProfitLossReport, AppBootstrapState } from '../backend';
-import { UserApprovalStatus, T as InvoiceStatus } from '../backend';
+import { ApprovalStatus, T as InvoiceStatus } from '../backend';
 import { Principal } from '@dfinity/principal';
 import { usePolling } from '../context/PollingContext';
 import { toast } from 'sonner';
@@ -30,26 +30,37 @@ export function useGetBootstrapState(enablePolling = false) {
   const query = useQuery<AppBootstrapState>({
     queryKey: ['bootstrapState'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      console.log('[Bootstrap] Fetching bootstrap state...');
-      const bootstrap = await actor.getBootstrapState();
-      console.log('[Bootstrap] Result:', {
-        hasProfile: !!bootstrap.userProfile,
-        isApproved: bootstrap.isApproved,
-        isAdmin: bootstrap.isAdmin,
-      });
-      
-      // Seed individual caches to avoid redundant calls
-      if (bootstrap.userProfile) {
-        queryClient.setQueryData(['currentUserProfile'], bootstrap.userProfile);
+      if (!actor) {
+        console.error('[Bootstrap] Actor not available');
+        throw new Error('Backend connection not available. Please check your internet connection.');
       }
-      queryClient.setQueryData(['isCallerApproved'], bootstrap.isApproved);
-      queryClient.setQueryData(['isCallerAdmin'], bootstrap.isAdmin);
       
-      return bootstrap;
+      console.log('[Bootstrap] Fetching bootstrap state...');
+      
+      try {
+        const bootstrap = await actor.getBootstrapState();
+        console.log('[Bootstrap] Result:', {
+          hasProfile: !!bootstrap.userProfile,
+          isApproved: bootstrap.isApproved,
+          isAdmin: bootstrap.isAdmin,
+        });
+        
+        // Seed individual caches to avoid redundant calls
+        if (bootstrap.userProfile) {
+          queryClient.setQueryData(['currentUserProfile'], bootstrap.userProfile);
+        }
+        queryClient.setQueryData(['isCallerApproved'], bootstrap.isApproved);
+        queryClient.setQueryData(['isCallerAdmin'], bootstrap.isAdmin);
+        
+        return bootstrap;
+      } catch (error: any) {
+        console.error('[Bootstrap] Failed to fetch bootstrap state:', error);
+        throw new Error(error?.message || 'Failed to load application data. Please try again.');
+      }
     },
     enabled: !!actor && !actorFetching,
-    retry: false,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     staleTime: enablePolling ? 0 : LONG_STALE_TIME,
     gcTime: 300000, // 5 minutes
     refetchInterval: enablePolling ? APPROVAL_PENDING_REFRESH_INTERVAL : false,
@@ -74,7 +85,7 @@ export function useGetCallerUserProfile() {
       return actor.getCallerUserProfile();
     },
     enabled: !!actor && !actorFetching,
-    retry: false,
+    retry: 2,
     staleTime: LONG_STALE_TIME,
     gcTime: 300000, // 5 minutes
   });
@@ -96,6 +107,7 @@ export function useGetUserProfile(userPrincipal: Principal | null) {
       return actor.getUserProfile(userPrincipal);
     },
     enabled: !!actor && !isFetching && !!userPrincipal,
+    retry: 2,
     staleTime: LONG_STALE_TIME,
     gcTime: 300000,
   });
@@ -107,13 +119,33 @@ export function useSaveCallerUserProfile() {
 
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
-      if (!actor) throw new Error('Actor not available');
-      console.log('[Profile Save] Calling backend saveCallerUserProfile with:', profile);
-      await actor.saveCallerUserProfile(profile);
-      console.log('[Profile Save] Backend saveCallerUserProfile completed successfully');
+      if (!actor) {
+        console.error('[Profile Save Mutation] Actor not available');
+        throw new Error('Backend connection not available');
+      }
+      
+      console.group('[Profile Save Mutation] Starting backend call');
+      console.log('[Profile Save Mutation] Timestamp:', new Date().toISOString());
+      console.log('[Profile Save Mutation] Profile data:', JSON.stringify(profile, null, 2));
+      
+      try {
+        console.log('[Profile Save Mutation] Calling actor.saveCallerUserProfile...');
+        const startTime = Date.now();
+        await actor.saveCallerUserProfile(profile);
+        const endTime = Date.now();
+        
+        console.log(`[Profile Save Mutation] ✓ Backend call completed successfully in ${endTime - startTime}ms`);
+        console.groupEnd();
+      } catch (backendError: any) {
+        console.error('[Profile Save Mutation] ✗ Backend call failed');
+        console.error('[Profile Save Mutation] Error:', backendError);
+        console.groupEnd();
+        throw backendError;
+      }
     },
     onSuccess: async (_, profile) => {
-      console.log('[Profile Save] Mutation onSuccess triggered');
+      console.log('[Profile Save Mutation] Profile saved successfully:', profile.name);
+      
       // Invalidate all related queries
       await queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
       await queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
@@ -125,11 +157,9 @@ export function useSaveCallerUserProfile() {
       
       // Force refetch bootstrap state to update UI
       await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
-      console.log('[Profile Save] All queries invalidated and refetched');
     },
     onError: (error: any) => {
-      console.error('[Profile Save] Mutation error:', error);
-      // Error is handled in the component
+      console.error('[Profile Save Mutation] Mutation failed:', error);
     },
   });
 }
@@ -144,9 +174,9 @@ export function useIsCallerAdmin() {
       return actor.isCallerAdmin();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: LONG_STALE_TIME,
     gcTime: 300000,
-    retry: 1,
   });
 }
 
@@ -163,9 +193,9 @@ export function useIsSuperAdmin() {
       return result;
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: LONG_STALE_TIME,
     gcTime: 300000,
-    retry: 1,
   });
 }
 
@@ -216,9 +246,9 @@ export function useIsCallerApproved() {
       return actor.isCallerApproved();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: LONG_STALE_TIME,
     gcTime: 300000,
-    retry: 1,
   });
 }
 
@@ -228,184 +258,125 @@ export function useRequestApproval() {
 
   return useMutation({
     mutationFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      console.log('[Approval Request] Calling backend requestApproval');
-      const startTime = Date.now();
-      await actor.requestApproval();
-      const endTime = Date.now();
-      console.log(`[Approval Request] Backend requestApproval completed successfully in ${endTime - startTime}ms`);
+      if (!actor) {
+        console.error('[Approval Request Mutation] Actor not available');
+        throw new Error('Backend connection not available');
+      }
+      
+      console.log('[Approval Request Mutation] Starting approval request...');
+      
+      try {
+        await actor.requestApproval();
+        console.log('[Approval Request Mutation] ✓ Approval request completed');
+      } catch (backendError: any) {
+        console.error('[Approval Request Mutation] ✗ Failed:', backendError);
+        throw backendError;
+      }
     },
     onSuccess: async () => {
-      console.log('[Approval Request] Mutation onSuccess triggered');
-      // Invalidate approval-related queries
+      console.log('[Approval Request Mutation] Invalidating queries...');
+      
       await queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
       await queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
       await queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
-      
-      // Force refetch to update UI immediately
-      await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
-      await queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
-      console.log('[Approval Request] Approval queries invalidated and refetched');
     },
     onError: (error: any) => {
-      console.error('[Approval Request] Mutation error:', error);
-      // Error is handled in the component
+      console.error('[Approval Request Mutation] Error:', error);
     },
   });
 }
 
-export function useGetAllUserAccounts(enabled = true) {
+// Approval Management (Primary Admin Only)
+export function useGetPendingUsers() {
   const { actor, isFetching } = useActor();
-
-  return useQuery({
-    queryKey: ['allUserAccounts'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      console.log('[User Accounts] Fetching all user accounts...');
-      const result = await actor.getAllUserAccounts();
-      console.log('[User Accounts] Fetched', result.length, 'user accounts');
-      return result;
-    },
-    enabled: !!actor && !isFetching && enabled,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 300000,
-    retry: 2,
-  });
-}
-
-// Get pending users (users awaiting approval)
-export function useGetPendingUsers(enabled = true) {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
 
   return useQuery<UserApprovalInfo[]>({
     queryKey: ['pendingUsers'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      console.log('[Pending Users] ========== FETCHING PENDING USERS ==========');
-      console.log('[Pending Users] Query enabled:', enabled);
-      console.log('[Pending Users] Actor available:', !!actor);
-      console.log('[Pending Users] Actor fetching:', isFetching);
-      console.log('[Pending Users] Timestamp:', new Date().toISOString());
-      
-      try {
-        const startTime = Date.now();
-        const result = await actor.getPendingUsers();
-        const endTime = Date.now();
-        
-        console.log('[Pending Users] ✓ SUCCESS - Fetched in', endTime - startTime, 'ms');
-        console.log('[Pending Users] Count:', result.length);
-        console.log('[Pending Users] Data:', result.map(u => ({
-          principal: u.principal.toString(),
-          status: u.status,
-        })));
-        console.log('[Pending Users] ========================================');
-        
-        return result;
-      } catch (error: any) {
-        console.error('[Pending Users] ✗ ERROR - Failed to fetch pending users');
-        console.error('[Pending Users] Error type:', error?.constructor?.name);
-        console.error('[Pending Users] Error message:', error?.message);
-        console.error('[Pending Users] Full error:', error);
-        console.log('[Pending Users] ========================================');
-        throw error;
-      }
+      if (!actor) return [];
+      console.log('[Pending Users Query] Fetching pending users...');
+      const result = await actor.getPendingUsers();
+      console.log('[Pending Users Query] Found:', result.length, 'pending users');
+      return result;
     },
-    enabled: !!actor && !isFetching && enabled,
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 300000,
+    enabled: !!actor && !isFetching,
     retry: 2,
-    refetchOnMount: 'always',
-    refetchInterval: shouldPoll ? 10000 : false, // Poll every 10 seconds when active
-    refetchIntervalInBackground: false,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 300000,
   });
 }
 
-// Approve user mutation
 export function useApproveUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (user: Principal) => {
+    mutationFn: async (userPrincipal: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      console.log('[Approve User] Approving user:', user.toString());
-      await actor.approveUser(user);
+      console.log('[Approve User] Approving user:', userPrincipal.toString());
+      await actor.approveUser(userPrincipal);
       console.log('[Approve User] User approved successfully');
     },
     onSuccess: () => {
-      console.log('[Approve User] Invalidating queries...');
-      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
-      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
-      queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
-      toast.success('User approved successfully!');
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      toast.success('User approved successfully');
     },
     onError: (error: any) => {
       console.error('[Approve User] Error:', error);
-      const errorMessage = error?.message || 'Failed to approve user';
-      toast.error(errorMessage);
+      toast.error(error?.message || 'Failed to approve user');
     },
   });
 }
 
-// Reject user mutation
 export function useRejectUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (user: Principal) => {
+    mutationFn: async (userPrincipal: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      console.log('[Reject User] Rejecting user:', user.toString());
-      await actor.rejectUser(user);
+      console.log('[Reject User] Rejecting user:', userPrincipal.toString());
+      await actor.rejectUser(userPrincipal);
       console.log('[Reject User] User rejected successfully');
     },
     onSuccess: () => {
-      console.log('[Reject User] Invalidating queries...');
-      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
-      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
-      queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
-      toast.success('User rejected successfully!');
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      toast.success('User rejected');
     },
     onError: (error: any) => {
       console.error('[Reject User] Error:', error);
-      const errorMessage = error?.message || 'Failed to reject user';
-      toast.error(errorMessage);
+      toast.error(error?.message || 'Failed to reject user');
     },
   });
 }
 
-// Remove user mutation (permanent deletion)
+// Remove user permanently (Primary Admin Only)
 export function useRemoveUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (user: Principal) => {
+    mutationFn: async (userPrincipal: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.permanentlyRemoveUserAccount(user);
+      console.log('[Remove User] Permanently removing user:', userPrincipal.toString());
+      await actor.permanentlyRemoveUserAccount(userPrincipal);
+      console.log('[Remove User] User removed successfully');
     },
-    onSuccess: (_, user) => {
-      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
-      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
-      queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
-      toast.success('User removed successfully!');
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      toast.success('User removed permanently');
     },
     onError: (error: any) => {
-      console.error('Remove user error:', error);
-      const errorMessage = error?.message || 'Failed to remove user';
-      toast.error(errorMessage);
+      console.error('[Remove User] Error:', error);
+      toast.error(error?.message || 'Failed to remove user');
     },
   });
 }
 
-// Assign role mutation
+// Assign app role mutation
 export function useAssignAppRole() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -413,178 +384,41 @@ export function useAssignAppRole() {
   return useMutation({
     mutationFn: async ({ user, role }: { user: Principal; role: AppRole }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.assignAppRole(user, role);
+      await actor.assignAppRole(user, role);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
-      queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
-      toast.success('Role assigned successfully!');
+      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      toast.success('Role assigned successfully');
     },
     onError: (error: any) => {
-      console.error('Assign role error:', error);
-      const errorMessage = error?.message || 'Failed to assign role';
-      toast.error(errorMessage);
-    },
-  });
-}
-
-// Secondary Admin Email Management
-export function useListSecondaryAdminEmails(enabled = true) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<string[]>({
-    queryKey: ['secondaryAdminEmails'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.listSecondaryAdminEmails();
-    },
-    enabled: !!actor && !isFetching && enabled,
-    staleTime: LONG_STALE_TIME,
-    gcTime: 300000,
-    retry: 2,
-  });
-}
-
-export function useAddSecondaryAdminEmail() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (email: string) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addSecondaryAdminEmail(email);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
-      queryClient.refetchQueries({ queryKey: ['secondaryAdminEmails'] });
-      toast.success('Secondary admin email added successfully!');
-    },
-    onError: (error: any) => {
-      console.error('Add secondary admin email error:', error);
-      const errorMessage = error?.message || 'Failed to add secondary admin email';
-      toast.error(errorMessage);
-    },
-  });
-}
-
-export function useRemoveSecondaryAdminEmail() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (email: string) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.removeSecondaryAdminEmail(email);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
-      queryClient.refetchQueries({ queryKey: ['secondaryAdminEmails'] });
-      toast.success('Secondary admin email removed successfully!');
-    },
-    onError: (error: any) => {
-      console.error('Remove secondary admin email error:', error);
-      const errorMessage = error?.message || 'Failed to remove secondary admin email';
-      toast.error(errorMessage);
-    },
-  });
-}
-
-// Customer Queries
-export function useListCustomers() {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll, activeModule } = usePolling();
-
-  return useQuery<Customer[]>({
-    queryKey: ['customers'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.listCustomers();
-    },
-    enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-    refetchInterval: shouldPoll && activeModule === 'customers' ? DASHBOARD_REFRESH_INTERVAL : false,
-    refetchIntervalInBackground: false,
-  });
-}
-
-export function useGetCustomer(customerId: bigint | null) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<Customer | null>({
-    queryKey: ['customer', customerId?.toString()],
-    queryFn: async () => {
-      if (!actor || customerId === null) return null;
-      return actor.getCustomer(customerId);
-    },
-    enabled: !!actor && !isFetching && customerId !== null,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-  });
-}
-
-export function useCreateCustomer() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (customer: { name: string; email: string; phone: string; address: string }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.createCustomer(customer.name, customer.email, customer.phone, customer.address);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.refetchQueries({ queryKey: ['customers'] });
-      toast.success('Customer created successfully!');
-    },
-    onError: (error: any) => {
-      console.error('Create customer error:', error);
-      const errorMessage = error?.message || 'Failed to create customer';
-      toast.error(errorMessage);
-    },
-  });
-}
-
-export function useDeleteCustomer() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (customerId: bigint) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.deleteCustomer(customerId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.refetchQueries({ queryKey: ['customers'] });
-      toast.success('Customer deleted successfully!');
-    },
-    onError: (error: any) => {
-      console.error('Delete customer error:', error);
-      const errorMessage = error?.message || 'Failed to delete customer';
-      toast.error(errorMessage);
+      console.error('[Assign Role] Error:', error);
+      toast.error(error?.message || 'Failed to assign role');
     },
   });
 }
 
 // Product Queries
-export function useListProducts() {
+export function useGetProducts() {
   const { actor, isFetching } = useActor();
   const { shouldPoll, activeModule } = usePolling();
 
   return useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) return [];
       return actor.listProducts();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
     refetchInterval: shouldPoll && activeModule === 'inventory' ? INVENTORY_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
 }
+
+// Backward compatibility aliases
+export const useListProducts = useGetProducts;
 
 export function useGetProduct(productId: bigint | null) {
   const { actor, isFetching } = useActor();
@@ -596,8 +430,8 @@ export function useGetProduct(productId: bigint | null) {
       return actor.getProduct(productId);
     },
     enabled: !!actor && !isFetching && productId !== null,
+    retry: 2,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
   });
 }
 
@@ -634,13 +468,11 @@ export function useAddProduct() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.refetchQueries({ queryKey: ['products'] });
-      toast.success('Product added successfully!');
+      toast.success('Product added successfully');
     },
     onError: (error: any) => {
-      console.error('Add product error:', error);
-      const errorMessage = error?.message || 'Failed to add product';
-      toast.error(errorMessage);
+      console.error('[Add Product] Error:', error);
+      toast.error(error?.message || 'Failed to add product');
     },
   });
 }
@@ -664,7 +496,7 @@ export function useUpdateProduct() {
       barcode: string;
     }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.updateProduct(
+      await actor.updateProduct(
         product.productId,
         product.name,
         product.description,
@@ -680,13 +512,12 @@ export function useUpdateProduct() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.refetchQueries({ queryKey: ['products'] });
-      toast.success('Product updated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+      toast.success('Product updated successfully');
     },
     onError: (error: any) => {
-      console.error('Update product error:', error);
-      const errorMessage = error?.message || 'Failed to update product';
-      toast.error(errorMessage);
+      console.error('[Update Product] Error:', error);
+      toast.error(error?.message || 'Failed to update product');
     },
   });
 }
@@ -698,41 +529,103 @@ export function useDeleteAllInventory() {
   return useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return actor.deleteAllInventory();
+      await actor.deleteAllInventory();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.refetchQueries({ queryKey: ['products'] });
-      queryClient.refetchQueries({ queryKey: ['inventory'] });
-      toast.success('All inventory deleted successfully!');
+      toast.success('All inventory deleted successfully');
     },
     onError: (error: any) => {
-      console.error('Delete all inventory error:', error);
-      const errorMessage = error?.message || 'Failed to delete all inventory';
-      toast.error(errorMessage);
+      console.error('[Delete All Inventory] Error:', error);
+      toast.error(error?.message || 'Failed to delete inventory');
+    },
+  });
+}
+
+// Customer Queries
+export function useGetCustomers() {
+  const { actor, isFetching } = useActor();
+  const { shouldPoll, activeModule } = usePolling();
+
+  return useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listCustomers();
+    },
+    enabled: !!actor && !isFetching,
+    retry: 2,
+    staleTime: MEDIUM_STALE_TIME,
+    refetchInterval: shouldPoll && activeModule === 'customers' ? DASHBOARD_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
+// Backward compatibility alias
+export const useListCustomers = useGetCustomers;
+
+export function useCreateCustomer() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (customer: { name: string; email: string; phone: string; address: string }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.createCustomer(customer.name, customer.email, customer.phone, customer.address);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Customer created successfully');
+    },
+    onError: (error: any) => {
+      console.error('[Create Customer] Error:', error);
+      toast.error(error?.message || 'Failed to create customer');
+    },
+  });
+}
+
+export function useDeleteCustomer() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (customerId: bigint) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.deleteCustomer(customerId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Customer deleted successfully');
+    },
+    onError: (error: any) => {
+      console.error('[Delete Customer] Error:', error);
+      toast.error(error?.message || 'Failed to delete customer');
     },
   });
 }
 
 // Order Queries
-export function useListOrders() {
+export function useGetOrders() {
   const { actor, isFetching } = useActor();
   const { shouldPoll, activeModule } = usePolling();
 
   return useQuery<OrderRecord[]>({
     queryKey: ['orders'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) return [];
       return actor.listOrders();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
     refetchInterval: shouldPoll && activeModule === 'orders' ? ORDER_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
 }
+
+// Backward compatibility alias
+export const useListOrders = useGetOrders;
 
 export function useCreateOrder() {
   const { actor } = useActor();
@@ -758,14 +651,11 @@ export function useCreateOrder() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.refetchQueries({ queryKey: ['orders'] });
-      queryClient.refetchQueries({ queryKey: ['products'] });
-      toast.success('Order created successfully!');
+      toast.success('Order created successfully');
     },
     onError: (error: any) => {
-      console.error('Create order error:', error);
-      const errorMessage = error?.message || 'Failed to create order';
-      toast.error(errorMessage);
+      console.error('[Create Order] Error:', error);
+      toast.error(error?.message || 'Failed to create order');
     },
   });
 }
@@ -777,58 +667,40 @@ export function useDeleteAllOrders() {
   return useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return actor.deleteAllOrders();
+      await actor.deleteAllOrders();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.refetchQueries({ queryKey: ['orders'] });
-      toast.success('All orders deleted successfully!');
+      toast.success('All orders deleted successfully');
     },
     onError: (error: any) => {
-      console.error('Delete all orders error:', error);
-      const errorMessage = error?.message || 'Failed to delete all orders';
-      toast.error(errorMessage);
+      console.error('[Delete All Orders] Error:', error);
+      toast.error(error?.message || 'Failed to delete orders');
     },
-  });
-}
-
-// Inventory Queries
-export function useListInventory() {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll, activeModule } = usePolling();
-
-  return useQuery<InventoryRecord[]>({
-    queryKey: ['inventory'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.listInventory();
-    },
-    enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-    refetchInterval: shouldPoll && activeModule === 'inventory' ? INVENTORY_REFRESH_INTERVAL : false,
-    refetchIntervalInBackground: false,
   });
 }
 
 // Invoice Queries
-export function useListInvoices() {
+export function useGetInvoices() {
   const { actor, isFetching } = useActor();
   const { shouldPoll, activeModule } = usePolling();
 
   return useQuery<Invoice[]>({
     queryKey: ['invoices'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) return [];
       return actor.listInvoices();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
     refetchInterval: shouldPoll && activeModule === 'invoices' ? INVOICE_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
 }
+
+// Backward compatibility alias
+export const useListInvoices = useGetInvoices;
 
 export function useGetInvoice(invoiceId: bigint | null) {
   const { actor, isFetching } = useActor();
@@ -840,8 +712,8 @@ export function useGetInvoice(invoiceId: bigint | null) {
       return actor.getInvoice(invoiceId);
     },
     enabled: !!actor && !isFetching && invoiceId !== null,
+    retry: 2,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
   });
 }
 
@@ -872,13 +744,11 @@ export function useCreateInvoice() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.refetchQueries({ queryKey: ['invoices'] });
-      toast.success('Invoice created successfully!');
+      toast.success('Invoice created successfully');
     },
     onError: (error: any) => {
-      console.error('Create invoice error:', error);
-      const errorMessage = error?.message || 'Failed to create invoice';
-      toast.error(errorMessage);
+      console.error('[Create Invoice] Error:', error);
+      toast.error(error?.message || 'Failed to create invoice');
     },
   });
 }
@@ -890,17 +760,16 @@ export function useStockAdjustInvoice() {
   return useMutation({
     mutationFn: async (invoiceId: bigint) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.stockAdjustInvoice(invoiceId);
+      await actor.stockAdjustInvoice(invoiceId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.refetchQueries({ queryKey: ['invoices'] });
-      queryClient.refetchQueries({ queryKey: ['products'] });
+      toast.success('Stock adjusted successfully');
     },
     onError: (error: any) => {
-      console.error('Stock adjust invoice error:', error);
-      throw error;
+      console.error('[Stock Adjust] Error:', error);
+      toast.error(error?.message || 'Failed to adjust stock');
     },
   });
 }
@@ -912,39 +781,40 @@ export function useClearAllInvoices() {
   return useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return actor.clearAllInvoices();
+      await actor.clearAllInvoices();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.refetchQueries({ queryKey: ['invoices'] });
-      toast.success('All invoices cleared successfully!');
+      toast.success('All invoices cleared successfully');
     },
     onError: (error: any) => {
-      console.error('Clear all invoices error:', error);
-      const errorMessage = error?.message || 'Failed to clear all invoices';
-      toast.error(errorMessage);
+      console.error('[Clear Invoices] Error:', error);
+      toast.error(error?.message || 'Failed to clear invoices');
     },
   });
 }
 
 // Notification Queries
-export function useListNotifications() {
+export function useGetNotifications() {
   const { actor, isFetching } = useActor();
   const { shouldPoll, activeModule } = usePolling();
 
   return useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) return [];
       return actor.listNotifications();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: SHORT_STALE_TIME,
-    gcTime: 300000,
     refetchInterval: shouldPoll && activeModule === 'notifications' ? NOTIFICATION_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
 }
+
+// Backward compatibility alias
+export const useListNotifications = useGetNotifications;
 
 export function useMarkNotificationAsRead() {
   const { actor } = useActor();
@@ -957,68 +827,161 @@ export function useMarkNotificationAsRead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.refetchQueries({ queryKey: ['notifications'] });
     },
     onError: (error: any) => {
-      console.error('Mark notification as read error:', error);
-      const errorMessage = error?.message || 'Failed to mark notification as read';
-      toast.error(errorMessage);
+      console.error('[Mark Notification Read] Error:', error);
+      toast.error(error?.message || 'Failed to mark notification as read');
     },
   });
 }
 
-// Dashboard Metrics (alias for useGetStats)
-export function useDashboardMetrics() {
+// Inventory Queries
+export function useGetInventory() {
   const { actor, isFetching } = useActor();
   const { shouldPoll, activeModule } = usePolling();
 
-  return useQuery<Stats>({
-    queryKey: ['dashboardMetrics'],
+  return useQuery<InventoryRecord[]>({
+    queryKey: ['inventory'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getStats();
+      if (!actor) return [];
+      return actor.listInventory();
     },
     enabled: !!actor && !isFetching,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 300000,
-    refetchInterval: shouldPoll && activeModule === 'dashboard' ? DASHBOARD_REFRESH_INTERVAL : false,
+    retry: 2,
+    staleTime: MEDIUM_STALE_TIME,
+    refetchInterval: shouldPoll && activeModule === 'inventory' ? INVENTORY_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
 }
 
-// Alias for backward compatibility
-export function useGetStats() {
-  return useDashboardMetrics();
-}
+// Backward compatibility alias
+export const useListInventory = useGetInventory;
 
-// Data Entries
-export function useListDataEntries() {
+// Data Entry Queries
+export function useGetDataEntries() {
   const { actor, isFetching } = useActor();
 
   return useQuery<DataEntry[]>({
     queryKey: ['dataEntries'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) return [];
       return actor.listDataEntries();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
   });
 }
 
-// Profit & Loss Report
+// Backward compatibility alias
+export const useListDataEntries = useGetDataEntries;
+
+// Stats Query
+export function useGetStats() {
+  const { actor, isFetching } = useActor();
+  const { shouldPoll, activeModule } = usePolling();
+
+  return useQuery<Stats>({
+    queryKey: ['stats'],
+    queryFn: async () => {
+      if (!actor) {
+        return {
+          totalCustomers: BigInt(0),
+          totalInventory: BigInt(0),
+          totalOrders: BigInt(0),
+          totalRevenue: BigInt(0),
+        };
+      }
+      return actor.getStats();
+    },
+    enabled: !!actor && !isFetching,
+    retry: 2,
+    staleTime: MEDIUM_STALE_TIME,
+    refetchInterval: shouldPoll && activeModule === 'dashboard' ? DASHBOARD_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
+// Alias for dashboard metrics (same as stats)
+export const useDashboardMetrics = useGetStats;
+
+// Profit & Loss Report Query
 export function useGetProfitLossReport(startDate: Time, endDate: Time) {
   const { actor, isFetching } = useActor();
 
   return useQuery<ProfitLossReport>({
     queryKey: ['profitLossReport', startDate.toString(), endDate.toString()],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        return {
+          revenue: BigInt(0),
+          cogs: BigInt(0),
+          grossProfit: BigInt(0),
+          expenses: BigInt(0),
+          netProfit: BigInt(0),
+          reportDateRange: { startDate, endDate },
+        };
+      }
       return actor.getProfitLossReport(startDate, endDate);
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
     staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
+  });
+}
+
+// Secondary Admin Email Management
+export function useListSecondaryAdminEmails() {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<string[]>({
+    queryKey: ['secondaryAdminEmails'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listSecondaryAdminEmails();
+    },
+    enabled: !!actor && !isFetching,
+    retry: 2,
+    staleTime: LONG_STALE_TIME,
+  });
+}
+
+export function useAddSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      await actor.addSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+      toast.success('Secondary admin email added successfully');
+    },
+    onError: (error: any) => {
+      console.error('[Add Secondary Admin Email] Error:', error);
+      toast.error(error?.message || 'Failed to add secondary admin email');
+    },
+  });
+}
+
+export function useRemoveSecondaryAdminEmail() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error('Actor not available');
+      await actor.removeSecondaryAdminEmail(email);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+      toast.success('Secondary admin email removed successfully');
+    },
+    onError: (error: any) => {
+      console.error('[Remove Secondary Admin Email] Error:', error);
+      toast.error(error?.message || 'Failed to remove secondary admin email');
+    },
   });
 }

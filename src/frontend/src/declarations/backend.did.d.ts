@@ -32,6 +32,11 @@ export interface BarcodeExportRequest {
   'exportType' : BarcodeExportFormat,
   'productId' : bigint,
 }
+export interface BootstrapStatus {
+  'canisterStatus' : [] | [SystemStatus],
+  'backendAvailable' : boolean,
+  'jsonSupport' : boolean,
+}
 export interface Customer {
   'id' : bigint,
   'created' : Time,
@@ -145,23 +150,17 @@ export interface Stats {
   'totalRevenue' : bigint,
   'totalCustomers' : bigint,
 }
+export type SystemStatus = { 'initialized' : null } |
+  { 'unknown' : null };
 export type T = { 'paid' : null } |
   { 'sent' : null } |
   { 'overdue' : null } |
   { 'draft' : null };
 export type Time = bigint;
-export interface UserAccount {
-  'id' : Principal,
-  'approvalStatus' : UserApprovalStatus,
-  'profile' : UserProfile,
-}
 export interface UserApprovalInfo {
   'status' : ApprovalStatus,
   'principal' : Principal,
 }
-export type UserApprovalStatus = { 'pending' : null } |
-  { 'approved' : null } |
-  { 'rejected' : null };
 export interface UserProfile {
   'appRole' : AppRole,
   'name' : string,
@@ -243,8 +242,8 @@ export interface _SERVICE {
     ExternalBlob
   >,
   'exportProductBarcode' : ActorMethod<[BarcodeExportRequest], ExternalBlob>,
-  'getAllUserAccounts' : ActorMethod<[], Array<UserAccount>>,
   'getBootstrapState' : ActorMethod<[], AppBootstrapState>,
+  'getBootstrapStatus' : ActorMethod<[], BootstrapStatus>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCustomer' : ActorMethod<[bigint], [] | [Customer]>,

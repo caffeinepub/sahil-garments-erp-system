@@ -1,85 +1,69 @@
 {
   "kind": "build_request",
-  "title": "Fix approval request flow - administrator not receiving requests",
+  "title": "Fix app initialization failure",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Verify that the backend submitApprovalRequest method correctly creates approval records in the system state when ProfileSetup component submits a request",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-6"
-        ],
-        "quotes": [
-          "administrator ke pass koi request nahi aa raha hai"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Approval requests are persisted in backend state when submitted from ProfileSetup",
-        "Backend logs confirm approval request creation with user details",
-        "Administrator queries return newly created approval requests"
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "text": "Ensure UserManagementModule correctly fetches and displays pending approval requests for administrators",
+      "text": "Investigate and fix the application initialization failure that prevents the app from opening properly after Version 49 deployment. Check for runtime errors in App.tsx bootstrap flow, authentication state handling, and any breaking changes in the recent profile save fix.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-6"
         ],
         "quotes": [
-          "administrator ke pass koi request nahi aa raha hai"
+          "app proper open nahi ho raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "UserManagementModule shows all pending approval requests in the UI",
-        "Pending users section displays user details including name, email, department, and requested role",
-        "List refreshes automatically or on manual trigger to show new requests"
+        "Application loads successfully without blocking errors",
+        "User can access the login page or dashboard depending on authentication state",
+        "No console errors related to initialization or bootstrap flow",
+        "Authentication flow completes without hanging"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Add comprehensive error boundaries and loading state handling to catch and display any initialization failures gracefully, showing user-friendly error messages instead of blank screens.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Error boundary wraps main App component to catch render errors",
+        "Loading states display properly during bootstrap fetch",
+        "Network failures show clear error messages with retry options",
+        "Failed authentication attempts provide actionable feedback"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Add comprehensive debug logging to track the full approval request lifecycle from submission through administrator retrieval",
-      "target": "both",
+      "text": "Verify backend actor initialization and canister availability to ensure the app can successfully connect to the backend services.",
+      "target": "backend",
       "source": {
         "messageIds": [
           "msg-6"
         ]
       },
       "acceptanceCriteria": [
-        "Frontend logs confirmation when ProfileSetup successfully submits approval request",
-        "Backend logs when approval request is received and stored",
-        "UserManagementModule logs when fetching pending approvals and the count retrieved",
-        "Error states are logged with full context for debugging"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "text": "Verify role-based access control allows administrators to access UserManagementModule and view pending approval requests",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-6"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Primary admin users can access UserManagementModule without restrictions",
-        "Backend authorization checks pass for admin role when fetching pending users",
-        "Secondary admins are correctly restricted from accessing the module if applicable"
+        "Backend canister responds to health checks",
+        "Actor methods are accessible from frontend",
+        "No CORS or network connectivity issues",
+        "Bootstrap data fetch returns expected structure"
       ]
     }
   ],
   "constraints": [
-    "Do not modify the Internet Identity authentication flow",
-    "Preserve existing role-based access control structure",
-    "Maintain compatibility with existing ProfileSetup and ApprovalPending components"
+    "Do not modify authentication hooks in frontend/src/hooks/useInternetIdentity.ts or frontend/src/hooks/useActor.ts",
+    "Preserve existing ProfileSetup component logic from Version 49",
+    "Maintain backward compatibility with existing user data"
   ],
   "nonGoals": [
-    "Redesigning the user management interface",
-    "Adding new approval workflow stages",
-    "Changing the role assignment system"
+    "Adding new features or modules",
+    "Redesigning the UI or user experience",
+    "Modifying role-based access control logic"
   ],
   "imageRequirements": {
     "required": [],

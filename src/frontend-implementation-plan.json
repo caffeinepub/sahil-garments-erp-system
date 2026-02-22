@@ -1,82 +1,79 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix approval request flow - administrator not receiving requests",
+  "title": "Fix app initialization failure",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Ensure UserManagementModule correctly fetches and displays pending approval requests for administrators",
+      "id": "REQ-1",
+      "summary": "Investigate and fix the application initialization failure that prevents the app from opening properly after Version 49 deployment",
       "acceptanceCriteria": [
-        "UserManagementModule shows all pending approval requests in the UI",
-        "Pending users section displays user details including name, email, department, and requested role",
-        "List refreshes automatically or on manual trigger to show new requests"
+        "Application loads successfully without blocking errors",
+        "User can access the login page or dashboard depending on authentication state",
+        "No console errors related to initialization or bootstrap flow",
+        "Authentication flow completes without hanging"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Add comprehensive logging to track when pending users are fetched, log the count of pending users retrieved, and ensure the UI properly displays all pending approval requests. Add error logging with full context when fetching fails. Verify that the getPendingUsers query is properly configured and not being cached incorrectly. Add a manual refresh button to force re-fetch pending users."
+          "description": "Fix initialization flow by: 1) Adding null safety checks for bootstrap state and user profile before rendering conditional components, 2) Ensuring proper error handling for failed bootstrap fetch, 3) Adding fallback states when data is partially loaded, 4) Verifying the conditional rendering logic for LoginPage, ProfileSetup, ApprovalPending, and Dashboard doesn't have race conditions, 5) Adding additional debug logging to trace where initialization fails, 6) Ensuring the component gracefully handles undefined or null values in bootstrap state"
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Review and enhance the useGetPendingUsers hook to ensure it properly fetches pending approval requests. Add logging when the query executes, log the response count, and verify the query is enabled correctly for admin users. Ensure proper error handling and that stale data is being refetched appropriately. Consider adjusting cacheTime and staleTime if pending users are being cached too aggressively."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Add comprehensive debug logging to track the full approval request lifecycle from submission through administrator retrieval",
-      "acceptanceCriteria": [
-        "Frontend logs confirmation when ProfileSetup successfully submits approval request",
-        "UserManagementModule logs when fetching pending approvals and the count retrieved",
-        "Error states are logged with full context for debugging"
-      ],
-      "file_operations": [
+          "description": "Fix bootstrap state query by: 1) Adding proper error handling and retry logic for getBootstrapState query, 2) Ensuring the query doesn't hang on network failures with appropriate timeout configuration, 3) Adding fallback values for when bootstrap state fetch fails, 4) Verifying enabled conditions don't create circular dependencies, 5) Adding detailed error logging to diagnose fetch failures"
+        },
         {
           "path": "frontend/src/components/ProfileSetup.tsx",
           "operation": "modify",
-          "description": "Add comprehensive logging when the approval request is submitted via requestApproval. Log success confirmation with timestamp, log any errors with full error context, and log the user's profile details being submitted. Add logging before and after the saveCallerUserProfile call to track the full submission flow. Ensure errors are caught and logged rather than silently failing."
+          "description": "Add error boundary protection and validation by: 1) Wrapping form submission in try-catch with user-friendly error messages, 2) Adding validation to ensure all required fields are populated before submission, 3) Handling edge cases where profile save succeeds but approval request fails, 4) Adding loading state to prevent double submissions, 5) Ensuring component doesn't crash on unexpected backend responses"
         },
         {
-          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "path": "frontend/src/components/ApprovalPending.tsx",
           "operation": "modify",
-          "description": "Add debug logging when the component mounts and when pending users are fetched. Log the count of pending users retrieved, log when the list is empty vs populated, and log any filtering or transformation of the pending users data. Add timestamp logging to track when data was last fetched successfully."
+          "description": "Fix polling and state handling by: 1) Adding error handling for failed status checks during polling, 2) Ensuring polling stops gracefully when component unmounts, 3) Adding null safety for user profile display, 4) Handling edge cases where approval status changes mid-poll, 5) Adding retry logic for transient network failures"
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/hooks/useActor.ts",
           "operation": "modify",
-          "description": "Add logging in useRequestApproval mutation to track approval request submissions. Log when the mutation starts, when it succeeds with response details, and when it fails with full error context. Add similar logging to useGetPendingUsers to track query execution timing and results."
-        },
-        {
-          "path": "frontend/src/utils/approvalErrors.ts",
-          "operation": "modify",
-          "description": "Enhance error parsing to preserve and log original error details before normalizing them. Add logging of raw error objects to help debug unexpected error formats. Ensure all error paths are logged comprehensively."
+          "description": "Verify actor initialization by: 1) Adding additional error logging for actor creation failures, 2) Ensuring the hook properly handles cases where backend canister is unavailable, 3) Adding timeout handling for slow actor initialization, 4) Verifying the enabled condition doesn't cause initialization to skip, 5) Adding fallback behavior when actor cannot be created. Do not modify the core authentication logic per constraints."
         }
       ]
     },
     {
-      "id": "REQ-4",
-      "summary": "Verify role-based access control allows administrators to access UserManagementModule and view pending approval requests",
+      "id": "REQ-2",
+      "summary": "Add comprehensive error boundaries and loading state handling to catch and display any initialization failures gracefully",
       "acceptanceCriteria": [
-        "Primary admin users can access UserManagementModule without restrictions",
-        "Secondary admins are correctly restricted from accessing the module if applicable"
+        "Error boundary wraps main App component to catch render errors",
+        "Loading states display properly during bootstrap fetch",
+        "Network failures show clear error messages with retry options",
+        "Failed authentication attempts provide actionable feedback"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "path": "frontend/src/components/ErrorBoundary.tsx",
+          "operation": "create",
+          "description": "Create a React error boundary component that: 1) Catches rendering errors in child components, 2) Displays a user-friendly error screen with error details and a retry button, 3) Logs error information to console for debugging, 4) Provides a reset function to clear error state and retry, 5) Includes styling consistent with the application theme"
+        },
+        {
+          "path": "frontend/src/main.tsx",
           "operation": "modify",
-          "description": "Add logging to verify role checks when the component renders. Log the user's role and admin status from bootstrap state. Log when access is denied and the reason. Verify that the useGetPendingUsers query is enabled correctly based on admin status. Add a visible indicator in the UI showing the current user's access level (primary admin vs secondary admin) for debugging purposes."
+          "description": "Wrap the App component with the new ErrorBoundary component to catch any initialization or rendering errors at the top level, ensuring users see a friendly error screen instead of a blank page when initialization fails"
         },
         {
           "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Add logging in the bootstrap state fetching to track admin role assignment and approval status. Log when bootstrap state is fetched successfully with full state details. Ensure isAdmin flag is properly set and logged. Add error logging if bootstrap state fetching fails."
+          "description": "Enhance loading and error states by: 1) Adding a dedicated loading screen component when bootstrap state is being fetched, 2) Adding error display with retry button when bootstrap fetch fails, 3) Ensuring loading states properly reflect all async operations (actor initialization, bootstrap fetch, profile fetch), 4) Adding network error detection and user-friendly error messages, 5) Implementing a retry mechanism that clears React Query cache and re-fetches bootstrap state"
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/components/InitializationError.tsx",
+          "operation": "create",
+          "description": "Create a dedicated component for displaying initialization failures that: 1) Shows a clear error message explaining the initialization failure, 2) Provides a retry button that triggers a full re-initialization, 3) Includes a link to contact support if retries fail, 4) Displays technical error details in a collapsible section for debugging, 5) Uses Sahil Garments branding and theme colors"
+        },
+        {
+          "path": "frontend/src/pages/LoginPage.tsx",
           "operation": "modify",
-          "description": "Review useGetBootstrapState hook to ensure admin status is properly returned and cached. Add logging when bootstrap state query executes and log the returned admin status. Verify that dependent queries like useGetPendingUsers properly depend on bootstrap state being loaded before executing."
+          "description": "Add error handling for authentication failures by: 1) Wrapping login button click in try-catch, 2) Displaying user-friendly error messages when Internet Identity login fails, 3) Adding retry logic for transient authentication errors, 4) Showing loading state during login process, 5) Handling cases where authentication succeeds but subsequent profile fetch fails"
         }
       ]
     }

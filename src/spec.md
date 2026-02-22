@@ -1,12 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the approval request flow so administrators receive and can view pending user approval requests.
+**Goal:** Fix the application initialization failure that prevents the app from opening properly after Version 49 deployment.
 
 **Planned changes:**
-- Verify backend correctly stores approval requests when ProfileSetup submits them
-- Ensure UserManagementModule fetches and displays all pending approval requests
-- Add debug logging throughout the approval request lifecycle (submission, storage, retrieval)
-- Verify role-based access control allows administrators to access pending approvals
+- Investigate and resolve runtime errors in App.tsx bootstrap flow and authentication state handling
+- Add error boundaries and loading state handling to catch initialization failures gracefully
+- Verify backend actor initialization and canister connectivity
+- Display user-friendly error messages instead of blank screens during failures
 
-**User-visible outcome:** Administrators will see pending approval requests in the UserManagementModule and can approve or reject new user registrations.
+**User-visible outcome:** The application loads successfully, users can access the login page or dashboard based on their authentication state, and any initialization errors are displayed with clear messages and retry options instead of blank screens.

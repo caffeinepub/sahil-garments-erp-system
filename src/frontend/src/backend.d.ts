@@ -14,6 +14,10 @@ export class ExternalBlob {
     static fromBytes(blob: Uint8Array<ArrayBuffer>): ExternalBlob;
     withUploadProgress(onProgress: (percentage: number) => void): ExternalBlob;
 }
+export interface BarcodeExportRequest {
+    exportType: BarcodeExportFormat;
+    productId: bigint;
+}
 export interface Product {
     inventoryStatus: InventoryStatus;
     name: string;
@@ -30,12 +34,6 @@ export interface Product {
     supplierId?: bigint;
     images: Array<ExternalBlob>;
 }
-export interface UserProfile {
-    appRole: AppRole;
-    name: string;
-    email: string;
-    department: string;
-}
 export type Time = bigint;
 export interface Stats {
     totalOrders: bigint;
@@ -46,11 +44,6 @@ export interface Stats {
 export interface ReportDateRange {
     endDate: Time;
     startDate: Time;
-}
-export interface UserAccount {
-    id: Principal;
-    approvalStatus: UserApprovalStatus;
-    profile: UserProfile;
 }
 export interface ProfitLossReport {
     reportDateRange: ReportDateRange;
@@ -68,6 +61,11 @@ export interface DataEntry {
     quantity: bigint;
     entityType: string;
     amount: bigint;
+}
+export interface BootstrapStatus {
+    canisterStatus?: SystemStatus;
+    backendAvailable: boolean;
+    jsonSupport: boolean;
 }
 export interface AppBootstrapState {
     isApproved: boolean;
@@ -149,15 +147,22 @@ export interface Notification {
     timestamp: Time;
     notificationId: bigint;
 }
-export interface BarcodeExportRequest {
-    exportType: BarcodeExportFormat;
-    productId: bigint;
+export interface UserProfile {
+    appRole: AppRole;
+    name: string;
+    email: string;
+    department: string;
 }
 export enum AppRole {
     accountant = "accountant",
     admin = "admin",
     sales = "sales",
     inventoryManager = "inventoryManager"
+}
+export enum ApprovalStatus {
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
 }
 export enum BarcodeExportFormat {
     pdf = "pdf",
@@ -172,16 +177,15 @@ export enum InvoiceExportFormat {
     pdf = "pdf",
     excel = "excel"
 }
+export enum SystemStatus {
+    initialized = "initialized",
+    unknown_ = "unknown"
+}
 export enum T {
     paid = "paid",
     sent = "sent",
     overdue = "overdue",
     draft = "draft"
-}
-export enum UserApprovalStatus {
-    pending = "pending",
-    approved = "approved",
-    rejected = "rejected"
 }
 export enum UserRole {
     admin = "admin",
@@ -210,8 +214,8 @@ export interface backendInterface {
     deleteNotification(notificationId: bigint): Promise<boolean>;
     exportInvoiceHistory(arg0: InvoiceExportFormat, arg1: InvoiceFilter | null, arg2: string | null, arg3: string | null): Promise<ExternalBlob>;
     exportProductBarcode(arg0: BarcodeExportRequest): Promise<ExternalBlob>;
-    getAllUserAccounts(): Promise<Array<UserAccount>>;
     getBootstrapState(): Promise<AppBootstrapState>;
+    getBootstrapStatus(): Promise<BootstrapStatus>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getCustomer(_customerId: bigint): Promise<Customer | null>;

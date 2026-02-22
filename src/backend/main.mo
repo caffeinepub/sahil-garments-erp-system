@@ -20,6 +20,7 @@ actor {
   include MixinStorage();
 
   type UserRole = AccessControl.UserRole;
+  type SystemStatus = { #unknown; #initialized };
 
   module EntityState {
     public type T = { #pending; #processing; #fulfilled; #cancelled };
@@ -273,6 +274,12 @@ actor {
     isAdmin : Bool;
   };
 
+  public type BootstrapStatus = {
+    backendAvailable : Bool;
+    jsonSupport : Bool;
+    canisterStatus : ?SystemStatus;
+  };
+
   // Variables
   let products = Map.empty<Nat, Product>();
   var nextProductId = 1;
@@ -302,6 +309,15 @@ actor {
   var nextNotificationId = 1;
 
   let STOCK_THRESHOLD = 5;
+
+  // Backend health check
+  public query ({ caller }) func getBootstrapStatus() : async BootstrapStatus {
+    {
+      backendAvailable = true;
+      jsonSupport = true; // Indicate JSON is supported via HttpOutcalls and frontend integration
+      canisterStatus = ?#initialized;
+    };
+  };
 
   // Authentication and Access Control
   let accessControlState = AccessControl.initState();
@@ -659,14 +675,6 @@ actor {
     );
     Debug.print("Backend: ListApprovals triggered from active admin portal. Returning all approval requests: " # debugList.size().toText());
     allApprovals;
-  };
-
-  // RESTRICTED: Only primary admins can view all user accounts
-  public shared ({ caller }) func getAllUserAccounts() : async [UserAccount] {
-    requirePrimaryAdmin(caller);
-
-    let iter = userAccounts.values();
-    iter.toArray();
   };
 
   private func convertApprovalStatus(status : UserApproval.ApprovalStatus) : UserApprovalStatus {
@@ -1653,3 +1661,4 @@ actor {
     UserApproval.setApproval(approvalState, targetUser, #rejected);
   };
 };
+
