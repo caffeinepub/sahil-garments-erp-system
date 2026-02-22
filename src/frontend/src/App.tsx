@@ -23,6 +23,16 @@ export default function App() {
     error: bootstrapError,
   } = useGetBootstrapState();
 
+  // Debug logging
+  useEffect(() => {
+    if (bootstrapFetched) {
+      console.log('Bootstrap state:', bootstrapState);
+      console.log('User profile:', bootstrapState?.userProfile);
+      console.log('Is approved:', bootstrapState?.isApproved);
+      console.log('Is admin:', bootstrapState?.isAdmin);
+    }
+  }, [bootstrapFetched, bootstrapState]);
+
   // Show loading during initialization
   if (isInitializing) {
     return <LoadingWorkspace />;
@@ -40,6 +50,7 @@ export default function App() {
 
   // Handle bootstrap errors (including rejection)
   if (bootstrapError) {
+    console.error('Bootstrap error:', bootstrapError);
     if (isRejectedError(bootstrapError)) {
       // User has been rejected - ApprovalPending will show rejection UI
       if (bootstrapState?.userProfile) {
@@ -52,15 +63,18 @@ export default function App() {
 
   // Profile setup required
   if (!bootstrapState?.userProfile) {
+    console.log('No user profile found, showing ProfileSetup');
     return <ProfileSetup />;
   }
 
   // Approval pending (not admin, not approved)
   if (!bootstrapState.isAdmin && !bootstrapState.isApproved) {
+    console.log('User not approved, showing ApprovalPending');
     return <ApprovalPending userProfile={bootstrapState.userProfile} />;
   }
 
   // Authenticated and approved - show dashboard
+  console.log('User authenticated and approved, showing Dashboard');
   return (
     <PollingProvider>
       <Suspense fallback={<LoadingWorkspace />}>

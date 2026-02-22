@@ -1,67 +1,67 @@
 {
   "kind": "build_request",
-  "title": "Fix profile save functionality",
+  "title": "Fix approval request not triggering for privileged roles",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Debug and fix the profile save functionality in ProfileSetup component to ensure user profiles are successfully saved to the backend",
-      "target": "both",
+      "text": "Fix the ProfileSetup component so that when a user selects a privileged role (admin, inventoryManager, or accountant) and saves their profile, the approval request is properly submitted to the backend and the user is redirected to the ApprovalPending screen",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-current"
+          "msg-latest"
         ],
         "quotes": [
-          "save profile nahi ho raha hai"
+          "You cannot assign privileged roles to yourself during profile creation. Please create your profile first, then contact an administrator to assign the appropriate role  request nahi aa raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "User can successfully save their profile with name, email, department, and role",
-        "Success feedback is displayed when profile is saved",
-        "Saved profile data persists and is reflected in the application",
-        "Clear error messages are shown if save fails"
+        "When a user selects a privileged role and clicks save, the approval request is submitted successfully",
+        "The user is redirected to the ApprovalPending screen after submitting the approval request",
+        "No error messages appear when the process completes successfully",
+        "The approval request appears in the UserManagementModule for admins to review"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Add proper error handling and user feedback in the profile setup flow to show why save operations fail",
-      "target": "frontend",
+      "text": "Verify that the backend requestApproval function is correctly receiving and processing approval requests from users with privileged roles",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-current"
+          "msg-latest"
         ]
       },
       "acceptanceCriteria": [
-        "Display specific error messages when profile save fails",
-        "Show loading state during save operation",
-        "Prevent duplicate submission while save is in progress"
+        "The requestApproval backend function successfully creates approval requests",
+        "Approval requests are stored with the correct user principal and requested role",
+        "The function returns success without throwing errors for valid requests"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Verify backend setUserProfile endpoint is correctly handling profile creation and returning appropriate success/error responses",
-      "target": "backend",
+      "text": "Add comprehensive error logging in ProfileSetup to capture any failures during the approval request submission process, including network errors, backend rejections, and validation failures",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-current"
+          "msg-latest"
         ]
       },
       "acceptanceCriteria": [
-        "Backend accepts valid profile data and persists it",
-        "Backend returns clear error messages for invalid inputs",
-        "Profile data is retrievable after successful save"
+        "Console logs show detailed error information if approval request fails",
+        "User sees a clear error message if the approval request cannot be submitted",
+        "Error messages distinguish between network failures, backend errors, and validation issues"
       ]
     }
   ],
   "constraints": [
-    "Do not change the existing role-based access control system",
-    "Maintain compatibility with Internet Identity authentication flow",
-    "Preserve existing user approval workflow"
+    "Do not modify the single-actor backend architecture",
+    "Preserve the existing approval workflow logic in ApprovalPending component",
+    "Maintain role-based access control for privileged roles"
   ],
   "nonGoals": [
-    "Redesigning the profile setup UI",
-    "Adding new profile fields beyond existing ones",
-    "Changing authentication mechanism"
+    "Changing the list of privileged roles",
+    "Modifying the admin approval interface",
+    "Altering the Internet Identity authentication flow"
   ],
   "imageRequirements": {
     "required": [],

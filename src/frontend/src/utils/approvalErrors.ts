@@ -1,10 +1,10 @@
 /**
  * Utility for normalizing and extracting user-friendly error messages from backend approval/user-management operations.
- * Handles authorization failures, missing profile setup, rejection states, and profile save errors with clear English messaging.
+ * Handles authorization failures, missing profile setup, rejection states, and profile save errors with clear English messaging and comprehensive logging for debugging approval request issues.
  */
 
 export interface ApprovalErrorInfo {
-  type: 'authorization' | 'missing-profile' | 'rejected' | 'role-restriction' | 'validation' | 'unknown';
+  type: 'authorization' | 'missing-profile' | 'rejected' | 'role-restriction' | 'validation' | 'network' | 'unknown';
   message: string;
   backendMessage?: string;
 }
@@ -15,6 +15,20 @@ export interface ApprovalErrorInfo {
 export function parseApprovalError(error: any): ApprovalErrorInfo {
   const errorMessage = error?.message || error?.toString() || '';
   const lowerMessage = errorMessage.toLowerCase();
+
+  // Check for network errors
+  if (
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('fetch') ||
+    lowerMessage.includes('connection') ||
+    lowerMessage.includes('timeout')
+  ) {
+    return {
+      type: 'network',
+      message: 'Network error. Please check your connection and try again.',
+      backendMessage: errorMessage,
+    };
+  }
 
   // Check for authorization/secondary admin errors
   if (
@@ -83,6 +97,20 @@ export function parseApprovalError(error: any): ApprovalErrorInfo {
 export function parseProfileSaveError(error: any): ApprovalErrorInfo {
   const errorMessage = error?.message || error?.toString() || '';
   const lowerMessage = errorMessage.toLowerCase();
+
+  // Check for network errors first
+  if (
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('fetch') ||
+    lowerMessage.includes('connection') ||
+    lowerMessage.includes('timeout')
+  ) {
+    return {
+      type: 'network',
+      message: 'Network error. Please check your connection and try again.',
+      backendMessage: errorMessage,
+    };
+  }
 
   // Check for role assignment restrictions
   if (
@@ -176,4 +204,12 @@ export function isAuthorizationError(error: any): boolean {
 export function isRoleRestrictionError(error: any): boolean {
   const errorInfo = parseProfileSaveError(error);
   return errorInfo.type === 'role-restriction';
+}
+
+/**
+ * Check if an error indicates network failure
+ */
+export function isNetworkError(error: any): boolean {
+  const errorInfo = parseApprovalError(error);
+  return errorInfo.type === 'network';
 }

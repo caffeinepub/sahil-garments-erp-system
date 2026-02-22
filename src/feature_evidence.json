@@ -2,11 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-debug-and-fix-the-profile-save-functionality-in-profilesetup-component-to-ensure-user-profiles-are-successfully-saved-to-the-backend",
-      "featureTitle": "Debug and fix the profile save functionality in ProfileSetup component to ensure user profiles are successfully saved to the backend",
+      "featureId": "feature-fix-the-profilesetup-component-so-that-when-a-user-selects-a-privileged-role-admin-inventorymanager-or-accountant-and-saves-their-profile-the-approval-request-is-properly-submitted-to-the-backend-and-the-user-is-redirected-to-the-approvalpending-screen",
+      "featureTitle": "Fix the ProfileSetup component so that when a user selects a privileged role (admin, inventoryManager, or accountant) and saves their profile, the approval request is properly submitted to the backend and the user is redirected to the ApprovalPending screen",
       "files": [
-        "frontend/src/components/ProfileSetup.tsx",
-        "frontend/src/hooks/useQueries.ts"
+        "frontend/src/components/ProfileSetup.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -27,8 +26,8 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-add-proper-error-handling-and-user-feedback-in-the-profile-setup-flow-to-show-why-save-operations-fail",
-      "featureTitle": "Add proper error handling and user feedback in the profile setup flow to show why save operations fail",
+      "featureId": "feature-add-comprehensive-error-logging-in-profilesetup-to-capture-any-failures-during-the-approval-request-submission-process-including-network-errors-backend-rejections-and-validation-failures",
+      "featureTitle": "Add comprehensive error logging in ProfileSetup to capture any failures during the approval request submission process, including network errors, backend rejections, and validation failures",
       "files": [
         "frontend/src/components/ProfileSetup.tsx",
         "frontend/src/utils/approvalErrors.ts"
@@ -47,7 +46,7 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-2"
+        "REQ-3"
       ],
       "confidence": "high"
     }

@@ -1,13 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the profile save functionality so users can successfully save their profile information.
+**Goal:** Fix the approval request workflow so that users selecting privileged roles (admin, inventoryManager, accountant) during profile setup can successfully submit approval requests and be redirected to the ApprovalPending screen.
 
 **Planned changes:**
-- Debug and fix the ProfileSetup component's save operation to ensure profiles are persisted to the backend
-- Add proper error handling and loading states during profile save
-- Display clear success/error messages to users
-- Verify backend setUserProfile endpoint correctly handles profile creation and returns appropriate responses
-- Prevent duplicate submissions while save is in progress
+- Fix ProfileSetup component to properly submit approval requests when privileged roles are selected
+- Verify backend requestApproval function correctly processes and stores approval requests
+- Add comprehensive error logging to capture failures during approval request submission
+- Ensure successful redirection to ApprovalPending screen after approval request submission
 
-**User-visible outcome:** Users can successfully save their profile with name, email, department, and role, with clear feedback on success or failure.
+**User-visible outcome:** Users selecting privileged roles during profile creation will successfully submit approval requests, see their request appear in the admin's UserManagementModule, and be redirected to the ApprovalPending screen without errors.

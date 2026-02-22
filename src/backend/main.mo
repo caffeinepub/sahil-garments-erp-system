@@ -681,7 +681,7 @@ actor {
 
     // Get existing profile to check if this is an update
     let existingProfile = userProfiles.get(caller);
-    
+
     switch (existingProfile) {
       case (null) {
         // NEW PROFILE CREATION: Only allow non-privileged roles unless secondary admin email
