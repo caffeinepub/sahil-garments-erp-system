@@ -257,6 +257,7 @@ export interface _SERVICE {
     Array<Invoice>
   >,
   'getOrder' : ActorMethod<[bigint], [] | [OrderRecord]>,
+  'getPendingUsers' : ActorMethod<[], Array<UserApprovalInfo>>,
   'getProduct' : ActorMethod<[bigint], [] | [Product]>,
   'getProductLocation' : ActorMethod<[bigint], [] | [InventoryLocation]>,
   'getProfitLossReport' : ActorMethod<[Time, Time], ProfitLossReport>,

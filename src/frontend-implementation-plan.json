@@ -1,60 +1,53 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Add user removal functionality to user management",
+  "title": "Fix Profile Save Functionality",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Add 'Remove User' button to each user row in the UserManagementModule table with confirmation dialog",
+      "id": "REQ-1",
+      "summary": "Debug and fix the profile save functionality in ProfileSetup component to ensure user profiles are successfully saved to the backend",
       "acceptanceCriteria": [
-        "Remove button appears for each user in the management table",
-        "Button is styled with destructive/warning styling to indicate permanent action",
-        "Clicking the button opens a confirmation dialog explaining the action is irreversible",
-        "Confirmation dialog displays the user's name and email for verification",
-        "Only primary admins can see and use the remove button"
+        "User can successfully save their profile with name, email, department, and role",
+        "Success feedback is displayed when profile is saved",
+        "Saved profile data persists and is reflected in the application",
+        "Clear error messages are shown if save fails"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "path": "frontend/src/components/ProfileSetup.tsx",
           "operation": "modify",
-          "description": "Add a 'Remove User' button to each user row in the users table. The button should be styled with destructive/warning colors (red/alert styling using shadcn/ui button variant='destructive'). When clicked, open a confirmation dialog that displays the user's name and email, warns that this action is permanent and irreversible, and requires explicit confirmation before proceeding. Only render the remove button for primary admins (check isSuperAdmin from useQueries). Integrate with the useRemoveUser mutation hook for the actual removal operation."
+          "description": "Fix the profile save functionality by ensuring proper form data collection, validation, and submission to the backend saveCallerUserProfile endpoint. Add loading state management during save operation, success feedback display upon successful save, and comprehensive error handling with user-friendly error messages. Ensure the form properly maps the selected appRole to the UserProfile structure expected by the backend. After successful save, trigger a refetch of the user profile to update the application state and close the profile setup modal."
         },
-        {
-          "path": "frontend/src/components/ui/alert-dialog.tsx",
-          "operation": "create",
-          "description": "Create a shadcn/ui AlertDialog component for the user removal confirmation. This reusable dialog should include AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, and AlertDialogAction. Use the destructive variant for the action button to emphasize the permanent nature of deletion."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Create a React Query mutation hook for removing users with query invalidation and toast notifications",
-      "acceptanceCriteria": [
-        "Mutation hook handles loading, success, and error states",
-        "On successful removal, the user list query is invalidated and refetched",
-        "Success toast notification confirms user removal",
-        "Error toast displays if removal fails with appropriate error message"
-      ],
-      "file_operations": [
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a useRemoveUser mutation hook that calls actor.permanentlyRemoveUserAccount(targetUser: Principal). The mutation should handle loading, success, and error states. On success, invalidate the 'allUserAccounts' query key to trigger a refetch of the user list. Display a success toast notification confirming user removal with the user's name. On error, display an error toast with the backend error message or a user-friendly fallback message. Use useMutation from @tanstack/react-query with appropriate onSuccess and onError callbacks."
+          "description": "Review and fix the saveCallerUserProfile mutation hook to ensure it properly calls the backend endpoint with correct parameters, handles response appropriately, and invalidates the 'currentUserProfile' query cache upon success. Verify the mutation error handling propagates errors correctly to the UI component. Ensure the mutation is properly typed with the UserProfile interface from backend.d.ts."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Review the profile setup flow logic to ensure proper state transitions after profile save. Verify that after successful profile save, the bootstrap state or user profile query is refetched to reflect the updated profile data. Ensure the ProfileSetup component is conditionally hidden after successful save and the main application content is displayed."
         }
       ]
     },
     {
-      "id": "REQ-4",
-      "summary": "Prevent users from removing themselves with frontend guards and error handling",
+      "id": "REQ-2",
+      "summary": "Add proper error handling and user feedback in the profile setup flow to show why save operations fail",
       "acceptanceCriteria": [
-        "Frontend hides or disables the remove button for the current user's own account",
-        "Attempting self-removal shows an error message explaining the restriction"
+        "Display specific error messages when profile save fails",
+        "Show loading state during save operation",
+        "Prevent duplicate submission while save is in progress"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "path": "frontend/src/components/ProfileSetup.tsx",
           "operation": "modify",
-          "description": "Add logic to prevent self-removal on the frontend. Compare each user's principal ID with the current user's identity (using identity.getPrincipal().toString() from useInternetIdentity). For the current user's own row, either hide the remove button entirely or render it in a disabled state with a tooltip explaining 'You cannot remove your own account'. If a removal attempt somehow proceeds for the current user (edge case), display an error toast with the message 'Cannot remove your own account to prevent lockout'."
+          "description": "Enhance error handling by displaying specific error messages extracted from backend responses using try-catch blocks. Add a loading state that disables the save button and shows a loading indicator during submission to prevent duplicate submissions. Display validation errors for empty required fields (name, email, department, role) before submission. Show a toast notification or inline alert with the specific error message when save fails, including backend authorization errors or network issues."
+        },
+        {
+          "path": "frontend/src/utils/approvalErrors.ts",
+          "operation": "modify",
+          "description": "Add utility functions to parse profile save errors from backend responses, extracting meaningful error messages for validation failures, authorization issues, or other backend errors. Create a dedicated error parser function for profile-related errors that can be reused across components."
         }
       ]
     }

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useGetAllUserAccounts, useApproveUser, useRejectUser, useAssignAppRole, useRemoveUser } from '../../hooks/useQueries';
+import { useGetAllUserAccounts, useGetPendingUsers, useApproveUser, useRejectUser, useAssignAppRole, useRemoveUser } from '../../hooks/useQueries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
+import { Users, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Loader2, Trash2, UserCheck } from 'lucide-react';
 import { UserProfile, AppRole, UserApprovalStatus } from '../../backend';
 import { Skeleton } from '@/components/ui/skeleton';
 import { parseApprovalError } from '../../utils/approvalErrors';
@@ -22,6 +22,7 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
   const { identity } = useInternetIdentity();
   // Only fetch user accounts if user has access
   const { data: userAccounts = [], isLoading, error } = useGetAllUserAccounts(canAccessUserManagement);
+  const { data: pendingUsers = [], isLoading: pendingLoading, error: pendingError } = useGetPendingUsers(canAccessUserManagement);
   const approveUser = useApproveUser();
   const rejectUser = useRejectUser();
   const removeUser = useRemoveUser();
@@ -191,6 +192,109 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
         <p className="text-muted-foreground mt-1">Manage user approvals and roles</p>
       </div>
 
+      {/* Pending Approval Requests Section */}
+      <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+            <UserCheck className="h-5 w-5" />
+            Pending Approval Requests
+            {pendingUsers.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {pendingUsers.length}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pendingLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : pendingError ? (
+            <div className="text-center py-4 text-destructive">
+              <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+              <p>Error loading pending users</p>
+            </div>
+          ) : pendingUsers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <CheckCircle2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No pending approval requests</p>
+              <p className="text-sm mt-1">All users have been processed</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Principal ID</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingUsers.map((pendingUser) => (
+                    <TableRow key={pendingUser.principal.toText()}>
+                      <TableCell className="font-mono text-sm">
+                        {pendingUser.principal.toText().slice(0, 20)}...
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="h-3 w-3" />
+                          Pending
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleApprove(pendingUser.principal)}
+                            disabled={approveUser.isPending || rejectUser.isPending}
+                          >
+                            {approveUser.isPending ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Approving...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleReject(pendingUser.principal)}
+                            disabled={approveUser.isPending || rejectUser.isPending}
+                          >
+                            {rejectUser.isPending ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Rejecting...
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Reject
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* All Users Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -413,16 +517,19 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="sales">Sales</SelectItem>
-                  <SelectItem value="inventoryManager">Inventory Manager</SelectItem>
-                  <SelectItem value="accountant">Accountant</SelectItem>
+                  <SelectItem value={AppRole.admin}>Admin</SelectItem>
+                  <SelectItem value={AppRole.sales}>Sales</SelectItem>
+                  <SelectItem value={AppRole.inventoryManager}>Inventory Manager</SelectItem>
+                  <SelectItem value={AppRole.accountant}>Accountant</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setSelectedUser(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleRoleAssignment} disabled={!selectedRole || assignAppRole.isPending}>
+              <AlertDialogAction
+                onClick={handleRoleAssignment}
+                disabled={!selectedRole || assignAppRole.isPending}
+              >
                 {assignAppRole.isPending ? (
                   <>
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />

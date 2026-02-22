@@ -1,55 +1,48 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-21T07:54:34.450Z",
+  "generatedAt": "2026-02-22T03:44:33.971Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 4,
-    "implemented": 3,
+    "total": 3,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Add a backend method in the main actor to allow primary admins to permanently remove user accounts from the system by principal ID",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Debug and fix the profile save functionality in ProfileSetup component to ensure user profiles are successfully saved to the backend",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/ProfileSetup.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/App.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/ProfileSetup.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ]
       },
       {
         "id": "REQ-2",
-        "summary": "Add a 'Remove User' button to each user row in the UserManagementModule table that triggers a confirmation dialog before deletion",
+        "summary": "Add proper error handling and user feedback in the profile setup flow to show why save operations fail",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/modules/UserManagementModule.tsx",
-          "frontend/src/components/ui/alert-dialog.tsx"
+          "frontend/src/components/ProfileSetup.tsx",
+          "frontend/src/utils/approvalErrors.ts"
         ],
         "matchedFiles": [
-          "frontend/src/components/modules/UserManagementModule.tsx"
+          "frontend/src/components/ProfileSetup.tsx",
+          "frontend/src/utils/approvalErrors.ts"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Create a React Query mutation hook for removing users that calls the backend removal method and invalidates relevant queries on success",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/hooks/useQueries.ts"
-        ],
-        "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts"
-        ]
-      },
-      {
-        "id": "REQ-4",
-        "summary": "Prevent users from removing themselves to avoid accidentally locking themselves out of the admin panel",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/modules/UserManagementModule.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/modules/UserManagementModule.tsx"
-        ]
+        "summary": "Verify backend setUserProfile endpoint is correctly handling profile creation and returning appropriate success/error responses",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
       }
     ]
   },
@@ -59,12 +52,9 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/components/modules/UserManagementModule.tsx",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
+    "frontend/src/components/ProfileSetup.tsx",
     "frontend/src/hooks/useQueries.ts",
+    "frontend/src/utils/approvalErrors.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

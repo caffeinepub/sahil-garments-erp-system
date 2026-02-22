@@ -102,16 +102,24 @@ export function useSaveCallerUserProfile() {
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.saveCallerUserProfile(profile);
+      await actor.saveCallerUserProfile(profile);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-      queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
-      queryClient.invalidateQueries({ queryKey: ['isCallerAdmin'] });
-      queryClient.invalidateQueries({ queryKey: ['isSecondaryAdmin'] });
-      queryClient.invalidateQueries({ queryKey: ['canAccessUserManagement'] });
-      queryClient.invalidateQueries({ queryKey: ['isSuperAdmin'] });
-      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+    onSuccess: async () => {
+      // Invalidate all related queries
+      await queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      await queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
+      await queryClient.invalidateQueries({ queryKey: ['isCallerAdmin'] });
+      await queryClient.invalidateQueries({ queryKey: ['isSecondaryAdmin'] });
+      await queryClient.invalidateQueries({ queryKey: ['canAccessUserManagement'] });
+      await queryClient.invalidateQueries({ queryKey: ['isSuperAdmin'] });
+      await queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+      
+      // Force refetch bootstrap state to update UI
+      await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
+    },
+    onError: (error: any) => {
+      console.error('Save profile error:', error);
+      // Error is handled in the component
     },
   });
 }
@@ -228,7 +236,31 @@ export function useGetAllUserAccounts(enabled = true) {
     enabled: !!actor && !isFetching && enabled,
     staleTime: SHORT_STALE_TIME,
     gcTime: 300000,
-    retry: false,
+    retry: 2,
+  });
+}
+
+// Get pending users (users awaiting approval)
+export function useGetPendingUsers(enabled = true) {
+  const { actor, isFetching } = useActor();
+  const { shouldPoll } = usePolling();
+
+  return useQuery<UserApprovalInfo[]>({
+    queryKey: ['pendingUsers'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      console.log('Fetching pending users...');
+      const result = await actor.getPendingUsers();
+      console.log('Pending users result:', result);
+      return result;
+    },
+    enabled: !!actor && !isFetching && enabled,
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 300000,
+    retry: 2,
+    refetchOnMount: 'always',
+    refetchInterval: shouldPoll ? 10000 : false, // Poll every 10 seconds when active
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -245,7 +277,9 @@ export function useApproveUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
       queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
       toast.success('User approved successfully!');
     },
     onError: (error: any) => {
@@ -269,7 +303,9 @@ export function useRejectUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
       queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
       toast.success('User rejected successfully!');
     },
     onError: (error: any) => {
@@ -292,7 +328,9 @@ export function useRemoveUser() {
     },
     onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
       queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
       toast.success('User removed successfully');
     },
     onError: (error: any) => {
@@ -327,7 +365,9 @@ export function useSetApproval() {
       // Immediately invalidate and refetch user accounts list
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
       queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
     },
     onError: (error) => {
       console.error('Set approval mutation error:', error);
@@ -346,7 +386,14 @@ export function useAssignAppRole() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
       queryClient.refetchQueries({ queryKey: ['allUserAccounts'] });
+      toast.success('Role assigned successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Assign role error:', error);
+      const errorMessage = error?.message || 'Failed to assign role';
+      toast.error(errorMessage);
     },
   });
 }
@@ -378,6 +425,12 @@ export function useAddSecondaryAdminEmail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+      toast.success('Secondary admin email added successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Add secondary admin email error:', error);
+      const errorMessage = error?.message || 'Failed to add secondary admin email';
+      toast.error(errorMessage);
     },
   });
 }
@@ -393,6 +446,12 @@ export function useRemoveSecondaryAdminEmail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['secondaryAdminEmails'] });
+      toast.success('Secondary admin email removed successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Remove secondary admin email error:', error);
+      const errorMessage = error?.message || 'Failed to remove secondary admin email';
+      toast.error(errorMessage);
     },
   });
 }
@@ -405,11 +464,12 @@ export function useGetCustomers() {
   return useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: async () => {
-      if (!actor) return [];
+      if (!actor) throw new Error('Actor not available');
       return actor.listCustomers();
     },
     enabled: !!actor && !isFetching,
     staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
     refetchInterval: shouldPoll ? DASHBOARD_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
@@ -417,6 +477,21 @@ export function useGetCustomers() {
 
 // Alias for backward compatibility
 export const useListCustomers = useGetCustomers;
+
+export function useGetCustomer(customerId: bigint | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<Customer | null>({
+    queryKey: ['customer', customerId?.toString()],
+    queryFn: async () => {
+      if (!actor || customerId === null) return null;
+      return actor.getCustomer(customerId);
+    },
+    enabled: !!actor && !isFetching && customerId !== null,
+    staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
+  });
+}
 
 export function useCreateCustomer() {
   const { actor } = useActor();
@@ -430,6 +505,12 @@ export function useCreateCustomer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('Customer created successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Create customer error:', error);
+      const errorMessage = error?.message || 'Failed to create customer';
+      toast.error(errorMessage);
     },
   });
 }
@@ -446,94 +527,12 @@ export function useDeleteCustomer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('Customer deleted successfully!');
     },
-  });
-}
-
-// Inventory Queries
-export function useListInventory() {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery<InventoryRecord[]>({
-    queryKey: ['inventory'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listInventory();
-    },
-    enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
-    refetchInterval: shouldPoll ? INVENTORY_REFRESH_INTERVAL : false,
-    refetchIntervalInBackground: false,
-  });
-}
-
-export function useAddInventoryEntry() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (entry: { productId: bigint; quantity: bigint; batch: string; supplierId: bigint }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addInventoryEntry(entry.productId, entry.quantity, entry.batch, entry.supplierId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-    },
-  });
-}
-
-// Order Queries
-export function useGetOrders() {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery<OrderRecord[]>({
-    queryKey: ['orders'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listOrders();
-    },
-    enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
-    refetchInterval: shouldPoll ? ORDER_REFRESH_INTERVAL : false,
-    refetchIntervalInBackground: false,
-  });
-}
-
-// Alias for backward compatibility
-export const useListOrders = useGetOrders;
-
-export function useCreateOrder() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (order: { customerId: bigint; productId: bigint; quantity: bigint; status: string; totalPrice: bigint }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.createOrder(order.customerId, order.productId, order.quantity, order.status, order.totalPrice);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
-  });
-}
-
-export function useDeleteAllOrders() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.deleteAllOrders();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    onError: (error: any) => {
+      console.error('Delete customer error:', error);
+      const errorMessage = error?.message || 'Failed to delete customer';
+      toast.error(errorMessage);
     },
   });
 }
@@ -546,11 +545,12 @@ export function useGetProducts() {
   return useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: async () => {
-      if (!actor) return [];
+      if (!actor) throw new Error('Actor not available');
       return actor.listProducts();
     },
     enabled: !!actor && !isFetching,
     staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
     refetchInterval: shouldPoll ? INVENTORY_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
@@ -558,6 +558,21 @@ export function useGetProducts() {
 
 // Alias for backward compatibility
 export const useListProducts = useGetProducts;
+
+export function useGetProduct(productId: bigint | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<Product | null>({
+    queryKey: ['product', productId?.toString()],
+    queryFn: async () => {
+      if (!actor || productId === null) return null;
+      return actor.getProduct(productId);
+    },
+    enabled: !!actor && !isFetching && productId !== null,
+    staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
+  });
+}
 
 export function useAddProduct() {
   const { actor } = useActor();
@@ -593,6 +608,12 @@ export function useAddProduct() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('Product added successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Add product error:', error);
+      const errorMessage = error?.message || 'Failed to add product';
+      toast.error(errorMessage);
     },
   });
 }
@@ -632,6 +653,13 @@ export function useUpdateProduct() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+      toast.success('Product updated successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Update product error:', error);
+      const errorMessage = error?.message || 'Failed to update product';
+      toast.error(errorMessage);
     },
   });
 }
@@ -649,21 +677,128 @@ export function useDeleteAllInventory() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('All inventory deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Delete all inventory error:', error);
+      const errorMessage = error?.message || 'Failed to delete all inventory';
+      toast.error(errorMessage);
     },
   });
 }
 
-export function useGetProduct(productId: bigint | null) {
+// Inventory Queries
+export function useGetInventory() {
+  const { actor, isFetching } = useActor();
+  const { shouldPoll } = usePolling();
+
+  return useQuery<InventoryRecord[]>({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.listInventory();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
+    refetchInterval: shouldPoll ? INVENTORY_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
+// Alias for backward compatibility
+export const useListInventory = useGetInventory;
+
+// Order Queries
+export function useGetOrders() {
+  const { actor, isFetching } = useActor();
+  const { shouldPoll } = usePolling();
+
+  return useQuery<OrderRecord[]>({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.listOrders();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 300000,
+    refetchInterval: shouldPoll ? ORDER_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
+// Alias for backward compatibility
+export const useListOrders = useGetOrders;
+
+export function useGetOrder(orderId: bigint | null) {
   const { actor, isFetching } = useActor();
 
-  return useQuery<Product | null>({
-    queryKey: ['product', productId?.toString()],
+  return useQuery<OrderRecord | null>({
+    queryKey: ['order', orderId?.toString()],
     queryFn: async () => {
-      if (!actor || !productId) return null;
-      return actor.getProduct(productId);
+      if (!actor || orderId === null) return null;
+      return actor.getOrder(orderId);
     },
-    enabled: !!actor && !isFetching && productId !== null,
-    staleTime: MEDIUM_STALE_TIME,
+    enabled: !!actor && !isFetching && orderId !== null,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 300000,
+  });
+}
+
+export function useCreateOrder() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (order: {
+      customerId: bigint;
+      productId: bigint;
+      quantity: bigint;
+      status: string;
+      totalPrice: bigint;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.createOrder(
+        order.customerId,
+        order.productId,
+        order.quantity,
+        order.status,
+        order.totalPrice
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('Order created successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Create order error:', error);
+      const errorMessage = error?.message || 'Failed to create order';
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useDeleteAllOrders() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.deleteAllOrders();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('All orders deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Delete all orders error:', error);
+      const errorMessage = error?.message || 'Failed to delete all orders';
+      toast.error(errorMessage);
+    },
   });
 }
 
@@ -675,11 +810,12 @@ export function useGetInvoices() {
   return useQuery<Invoice[]>({
     queryKey: ['invoices'],
     queryFn: async () => {
-      if (!actor) return [];
+      if (!actor) throw new Error('Actor not available');
       return actor.listInvoices();
     },
     enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 300000,
     refetchInterval: shouldPoll ? INVOICE_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
@@ -694,11 +830,12 @@ export function useGetInvoice(invoiceId: bigint | null) {
   return useQuery<Invoice | null>({
     queryKey: ['invoice', invoiceId?.toString()],
     queryFn: async () => {
-      if (!actor || !invoiceId) return null;
+      if (!actor || invoiceId === null) return null;
       return actor.getInvoice(invoiceId);
     },
     enabled: !!actor && !isFetching && invoiceId !== null,
-    staleTime: MEDIUM_STALE_TIME,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 300000,
   });
 }
 
@@ -730,6 +867,12 @@ export function useCreateInvoice() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('Invoice created successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Create invoice error:', error);
+      const errorMessage = error?.message || 'Failed to create invoice';
+      toast.error(errorMessage);
     },
   });
 }
@@ -748,28 +891,9 @@ export function useStockAdjustInvoice() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
-  });
-}
-
-export function useUpdateInvoiceDocumentUrls() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      invoiceId,
-      imageUrl,
-      pdfUrl,
-    }: {
-      invoiceId: bigint;
-      imageUrl: string | null;
-      pdfUrl: string | null;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.updateInvoiceDocumentUrls(invoiceId, imageUrl, pdfUrl);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    onError: (error: any) => {
+      console.error('Stock adjust invoice error:', error);
+      throw error;
     },
   });
 }
@@ -786,6 +910,12 @@ export function useClearAllInvoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('All invoices cleared successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Clear all invoices error:', error);
+      const errorMessage = error?.message || 'Failed to clear all invoices';
+      toast.error(errorMessage);
     },
   });
 }
@@ -798,11 +928,12 @@ export function useGetNotifications() {
   return useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
-      if (!actor) return [];
+      if (!actor) throw new Error('Actor not available');
       return actor.listNotifications();
     },
     enabled: !!actor && !isFetching,
     staleTime: SHORT_STALE_TIME,
+    gcTime: 300000,
     refetchInterval: shouldPoll ? NOTIFICATION_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
@@ -823,10 +954,32 @@ export function useMarkNotificationAsRead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
+    onError: (error: any) => {
+      console.error('Mark notification as read error:', error);
+    },
   });
 }
 
-// Stats Query (Dashboard Metrics)
+// Data Entry Queries
+export function useGetDataEntries() {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<DataEntry[]>({
+    queryKey: ['dataEntries'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.listDataEntries();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
+  });
+}
+
+// Alias for backward compatibility
+export const useListDataEntries = useGetDataEntries;
+
+// Stats Query
 export function useGetStats() {
   const { actor, isFetching } = useActor();
   const { shouldPoll } = usePolling();
@@ -838,49 +991,15 @@ export function useGetStats() {
       return actor.getStats();
     },
     enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
+    staleTime: SHORT_STALE_TIME,
+    gcTime: 300000,
     refetchInterval: shouldPoll ? DASHBOARD_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
   });
 }
 
-// Alias for dashboard metrics
+// Dashboard Metrics - Alias for stats
 export const useDashboardMetrics = useGetStats;
-
-// Data Entries Queries
-export function useListDataEntries() {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<DataEntry[]>({
-    queryKey: ['dataEntries'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listDataEntries();
-    },
-    enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
-  });
-}
-
-export function useCreateDataEntry() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (entry: {
-      entityType: string;
-      entryId: bigint;
-      amount: bigint;
-      quantity: bigint;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.createDataEntry(entry.entityType, entry.entryId, entry.amount, entry.quantity);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dataEntries'] });
-    },
-  });
-}
 
 // Profit & Loss Report Query
 export function useGetProfitLossReport(startDate: Time, endDate: Time) {
@@ -894,5 +1013,6 @@ export function useGetProfitLossReport(startDate: Time, endDate: Time) {
     },
     enabled: !!actor && !isFetching,
     staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
   });
 }

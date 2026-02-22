@@ -2,33 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-add-a-remove-user-button-to-each-user-row-in-the-usermanagementmodule-table-that-triggers-a-confirmation-dialog-before-deletion",
-      "featureTitle": "Add a 'Remove User' button to each user row in the UserManagementModule table that triggers a confirmation dialog before deletion",
+      "featureId": "feature-debug-and-fix-the-profile-save-functionality-in-profilesetup-component-to-ensure-user-profiles-are-successfully-saved-to-the-backend",
+      "featureTitle": "Debug and fix the profile save functionality in ProfileSetup component to ensure user profiles are successfully saved to the backend",
       "files": [
-        "frontend/src/components/modules/UserManagementModule.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "blob-storage@4.0.0",
-        "camera@1.0.0",
-        "qr-code@1.0.0",
-        "http-outcalls@3.0.0",
-        "user-approval@3.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-2"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-create-a-react-query-mutation-hook-for-removing-users-that-calls-the-backend-removal-method-and-invalidates-relevant-queries-on-success",
-      "featureTitle": "Create a React Query mutation hook for removing users that calls the backend removal method and invalidates relevant queries on success",
-      "files": [
+        "frontend/src/components/ProfileSetup.tsx",
         "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
@@ -45,15 +22,16 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-3"
+        "REQ-1"
       ],
       "confidence": "high"
     },
     {
-      "featureId": "feature-prevent-users-from-removing-themselves-to-avoid-accidentally-locking-themselves-out-of-the-admin-panel",
-      "featureTitle": "Prevent users from removing themselves to avoid accidentally locking themselves out of the admin panel",
+      "featureId": "feature-add-proper-error-handling-and-user-feedback-in-the-profile-setup-flow-to-show-why-save-operations-fail",
+      "featureTitle": "Add proper error handling and user feedback in the profile setup flow to show why save operations fail",
       "files": [
-        "frontend/src/components/modules/UserManagementModule.tsx"
+        "frontend/src/components/ProfileSetup.tsx",
+        "frontend/src/utils/approvalErrors.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -69,7 +47,7 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-4"
+        "REQ-2"
       ],
       "confidence": "high"
     }

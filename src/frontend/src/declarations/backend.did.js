@@ -142,6 +142,15 @@ export const OrderRecord = IDL.Record({
   'customerId' : IDL.Nat,
   'totalPrice' : IDL.Nat,
 });
+export const ApprovalStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const UserApprovalInfo = IDL.Record({
+  'status' : ApprovalStatus,
+  'principal' : IDL.Principal,
+});
 export const InventoryStatus = IDL.Variant({
   'low' : IDL.Null,
   'inStock' : IDL.Null,
@@ -181,15 +190,6 @@ export const Stats = IDL.Record({
   'totalInventory' : IDL.Nat,
   'totalRevenue' : IDL.Nat,
   'totalCustomers' : IDL.Nat,
-});
-export const ApprovalStatus = IDL.Variant({
-  'pending' : IDL.Null,
-  'approved' : IDL.Null,
-  'rejected' : IDL.Null,
-});
-export const UserApprovalInfo = IDL.Record({
-  'status' : ApprovalStatus,
-  'principal' : IDL.Principal,
 });
 export const Notification = IDL.Record({
   'title' : IDL.Text,
@@ -320,6 +320,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getOrder' : IDL.Func([IDL.Nat], [IDL.Opt(OrderRecord)], ['query']),
+  'getPendingUsers' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
   'getProductLocation' : IDL.Func(
       [IDL.Nat],
@@ -525,6 +526,15 @@ export const idlFactory = ({ IDL }) => {
     'customerId' : IDL.Nat,
     'totalPrice' : IDL.Nat,
   });
+  const ApprovalStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const UserApprovalInfo = IDL.Record({
+    'status' : ApprovalStatus,
+    'principal' : IDL.Principal,
+  });
   const InventoryStatus = IDL.Variant({
     'low' : IDL.Null,
     'inStock' : IDL.Null,
@@ -564,15 +574,6 @@ export const idlFactory = ({ IDL }) => {
     'totalInventory' : IDL.Nat,
     'totalRevenue' : IDL.Nat,
     'totalCustomers' : IDL.Nat,
-  });
-  const ApprovalStatus = IDL.Variant({
-    'pending' : IDL.Null,
-    'approved' : IDL.Null,
-    'rejected' : IDL.Null,
-  });
-  const UserApprovalInfo = IDL.Record({
-    'status' : ApprovalStatus,
-    'principal' : IDL.Principal,
   });
   const Notification = IDL.Record({
     'title' : IDL.Text,
@@ -707,6 +708,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getOrder' : IDL.Func([IDL.Nat], [IDL.Opt(OrderRecord)], ['query']),
+    'getPendingUsers' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
     'getProductLocation' : IDL.Func(
         [IDL.Nat],

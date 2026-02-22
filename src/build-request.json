@@ -1,83 +1,67 @@
 {
   "kind": "build_request",
-  "title": "Add user removal functionality to user management",
-  "priority": "normal",
+  "title": "Fix profile save functionality",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Add a backend method in the main actor to allow primary admins to permanently remove user accounts from the system by principal ID",
-      "target": "backend",
+      "text": "Debug and fix the profile save functionality in ProfileSetup component to ensure user profiles are successfully saved to the backend",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-user-remove-request"
+          "msg-current"
+        ],
+        "quotes": [
+          "save profile nahi ho raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "Method validates that the caller is a primary admin before allowing removal",
-        "Method accepts a principal ID and removes the corresponding user profile from state",
-        "Method returns success confirmation or appropriate error messages",
-        "Removed users cannot access the system after deletion"
+        "User can successfully save their profile with name, email, department, and role",
+        "Success feedback is displayed when profile is saved",
+        "Saved profile data persists and is reflected in the application",
+        "Clear error messages are shown if save fails"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Add a 'Remove User' button to each user row in the UserManagementModule table that triggers a confirmation dialog before deletion",
+      "text": "Add proper error handling and user feedback in the profile setup flow to show why save operations fail",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-user-remove-request"
+          "msg-current"
         ]
       },
       "acceptanceCriteria": [
-        "Remove button appears for each user in the management table",
-        "Button is styled with destructive/warning styling to indicate permanent action",
-        "Clicking the button opens a confirmation dialog explaining the action is irreversible",
-        "Confirmation dialog displays the user's name and email for verification",
-        "Only primary admins can see and use the remove button"
+        "Display specific error messages when profile save fails",
+        "Show loading state during save operation",
+        "Prevent duplicate submission while save is in progress"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Create a React Query mutation hook for removing users that calls the backend removal method and invalidates relevant queries on success",
-      "target": "frontend",
+      "text": "Verify backend setUserProfile endpoint is correctly handling profile creation and returning appropriate success/error responses",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-user-remove-request"
+          "msg-current"
         ]
       },
       "acceptanceCriteria": [
-        "Mutation hook handles loading, success, and error states",
-        "On successful removal, the user list query is invalidated and refetched",
-        "Success toast notification confirms user removal",
-        "Error toast displays if removal fails with appropriate error message"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "text": "Prevent users from removing themselves to avoid accidentally locking themselves out of the admin panel",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-user-remove-request"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Backend method rejects removal requests where the caller's principal matches the target user",
-        "Frontend hides or disables the remove button for the current user's own account",
-        "Attempting self-removal shows an error message explaining the restriction"
+        "Backend accepts valid profile data and persists it",
+        "Backend returns clear error messages for invalid inputs",
+        "Profile data is retrievable after successful save"
       ]
     }
   ],
   "constraints": [
-    "Only primary admins can remove users (secondary admins must not have access)",
-    "User removal must be a permanent, irreversible action",
-    "The current logged-in admin cannot remove their own account"
+    "Do not change the existing role-based access control system",
+    "Maintain compatibility with Internet Identity authentication flow",
+    "Preserve existing user approval workflow"
   ],
   "nonGoals": [
-    "Soft deletion or archiving of users (removal should be permanent)",
-    "Bulk user removal functionality",
-    "User suspension or temporary account deactivation",
-    "Restoring or recovering removed users"
+    "Redesigning the profile setup UI",
+    "Adding new profile fields beyond existing ones",
+    "Changing authentication mechanism"
   ],
   "imageRequirements": {
     "required": [],

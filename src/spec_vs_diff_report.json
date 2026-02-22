@@ -1,16 +1,41 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-21T07:54:34.448Z",
-  "summary": "The diff implements all four requirements with backend removal method, frontend Remove User button with confirmation dialog, React Query mutation hook, and self-removal prevention. All acceptance criteria appear to be covered based on the available evidence.",
-  "missing_requirements": [],
-  "hallucinated_features": [],
-  "confidence": 0.85,
+  "generatedAt": "2026-02-22T03:44:33.968Z",
+  "summary": "The diff implements comprehensive fixes for profile save functionality across frontend and backend. REQ-1 is fully addressed with profile save implementation, success feedback, and error handling. REQ-2 is comprehensively implemented with specific error messages, loading states, and duplicate submission prevention. REQ-3 is partially addressed - backend profile handling logic is visible but the specific setUserProfile/saveCallerUserProfile endpoint implementation is truncated, making complete verification impossible.",
+  "missing_requirements": [
+    {
+      "id": "REQ-3",
+      "requirement": "Complete verification of backend setUserProfile endpoint handling and error responses",
+      "reason": "Backend main.mo file is truncated at 4000 chars, cutting off before the saveCallerUserProfile endpoint implementation. Cannot verify if backend properly persists profile data, returns clear error messages for invalid inputs, or ensures profile data is retrievable after save.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "parseProfileSaveError utility function for role restriction errors",
+      "reason": "The utility includes specific handling for role assignment restrictions (cannot self-assign admin role, cannot self-assign privileged roles) which was not requested in the BuildRequest. The requirement only asked for clear error messages without specifying role restriction logic.",
+      "evidence": [
+        "frontend/src/utils/approvalErrors.ts"
+      ]
+    },
+    {
+      "description": "Bootstrap state optimization with query seeding",
+      "reason": "The useGetBootstrapState hook includes cache seeding logic (Seed individual caches to avoid redundant calls) and polling configuration that was not requested. The requirement focused on profile save functionality, not query optimization.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    }
+  ],
+  "confidence": 0.75,
   "changed_files": [
     "backend/main.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/modules/UserManagementModule.tsx",
+    "frontend/src/components/ProfileSetup.tsx",
     "frontend/src/hooks/useQueries.ts",
+    "frontend/src/utils/approvalErrors.ts",
     "project_state.json"
   ]
 }

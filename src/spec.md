@@ -1,12 +1,13 @@
 # Specification
 
 ## Summary
-**Goal:** Enable primary admins to permanently remove user accounts from the system.
+**Goal:** Fix the profile save functionality so users can successfully save their profile information.
 
 **Planned changes:**
-- Add backend method for primary admins to remove users by principal ID
-- Add "Remove User" button with confirmation dialog to each user row in the management table
-- Create React Query mutation hook to handle user removal and refresh the user list
-- Prevent admins from removing their own account
+- Debug and fix the ProfileSetup component's save operation to ensure profiles are persisted to the backend
+- Add proper error handling and loading states during profile save
+- Display clear success/error messages to users
+- Verify backend setUserProfile endpoint correctly handles profile creation and returns appropriate responses
+- Prevent duplicate submissions while save is in progress
 
-**User-visible outcome:** Primary admins can permanently delete user accounts through the user management interface with a confirmation step, improving account management capabilities.
+**User-visible outcome:** Users can successfully save their profile with name, email, department, and role, with clear feedback on success or failure.

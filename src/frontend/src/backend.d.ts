@@ -221,6 +221,7 @@ export interface backendInterface {
     getInvoice(invoiceId: bigint): Promise<Invoice | null>;
     getInvoiceHistory(filter: InvoiceFilter | null, sortBy: string | null, sortOrder: string | null): Promise<Array<Invoice>>;
     getOrder(orderId: bigint): Promise<OrderRecord | null>;
+    getPendingUsers(): Promise<Array<UserApprovalInfo>>;
     getProduct(productId: bigint): Promise<Product | null>;
     getProductLocation(productId: bigint): Promise<InventoryLocation | null>;
     getProfitLossReport(startDate: Time, endDate: Time): Promise<ProfitLossReport>;

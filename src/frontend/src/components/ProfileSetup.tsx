@@ -9,33 +9,63 @@ import { UserCircle, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppRole } from '../backend';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { parseProfileSaveError } from '../utils/approvalErrors';
 
 export default function ProfileSetup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
   const [appRole, setAppRole] = useState<AppRole | ''>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const saveProfile = useSaveCallerUserProfile();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage('');
 
-    if (!name || !email || !department || !appRole) {
-      toast.error('Please fill in all fields');
+    // Validate all fields
+    if (!name.trim()) {
+      const error = 'Please enter your name';
+      setErrorMessage(error);
+      toast.error(error);
+      return;
+    }
+
+    if (!email.trim()) {
+      const error = 'Please enter your email';
+      setErrorMessage(error);
+      toast.error(error);
+      return;
+    }
+
+    if (!department.trim()) {
+      const error = 'Please enter your department';
+      setErrorMessage(error);
+      toast.error(error);
+      return;
+    }
+
+    if (!appRole) {
+      const error = 'Please select a role';
+      setErrorMessage(error);
+      toast.error(error);
       return;
     }
 
     try {
       await saveProfile.mutateAsync({
-        name,
-        email,
-        department,
+        name: name.trim(),
+        email: email.trim(),
+        department: department.trim(),
         appRole: appRole as AppRole,
       });
       toast.success('Profile saved successfully!');
+      // The App.tsx will automatically detect the profile and transition to the next screen
     } catch (error: any) {
-      toast.error(error.message || 'Failed to save profile');
-      console.error(error);
+      console.error('Profile save error:', error);
+      const errorInfo = parseProfileSaveError(error);
+      setErrorMessage(errorInfo.message);
+      toast.error(errorInfo.message);
     }
   };
 
@@ -54,6 +84,15 @@ export default function ProfileSetup() {
         
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {errorMessage && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  {errorMessage}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="name">Full Name *</Label>
               <Input
@@ -62,6 +101,7 @@ export default function ProfileSetup() {
                 placeholder="Enter your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={saveProfile.isPending}
                 required
               />
             </div>
@@ -74,6 +114,7 @@ export default function ProfileSetup() {
                 placeholder="Your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={saveProfile.isPending}
                 required
               />
             </div>
@@ -86,13 +127,21 @@ export default function ProfileSetup() {
                 placeholder="Your department"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
+                disabled={saveProfile.isPending}
                 required
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
-              <Select value={appRole} onValueChange={(value) => setAppRole(value as AppRole)}>
+              <Select 
+                value={appRole} 
+                onValueChange={(value) => {
+                  setAppRole(value as AppRole);
+                  setErrorMessage('');
+                }}
+                disabled={saveProfile.isPending}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -105,11 +154,11 @@ export default function ProfileSetup() {
               </Select>
             </div>
 
-            {appRole === AppRole.admin && (
+            {(appRole === AppRole.admin || appRole === AppRole.sales || appRole === AppRole.inventoryManager || appRole === AppRole.accountant) && (
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  Note: Admin role requires approval from system administrator.
+                  Note: Privileged roles require approval from system administrator. If you are not a pre-authorized admin, your profile will be created but you'll need to wait for admin approval.
                 </AlertDescription>
               </Alert>
             )}

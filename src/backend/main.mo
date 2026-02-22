@@ -663,6 +663,14 @@ actor {
     userProfiles.get(user);
   };
 
+  // RESTRICTED: Only primary admins can view pending users (User Management function)
+  public query ({ caller }) func getPendingUsers() : async [UserApproval.UserApprovalInfo] {
+    requirePrimaryAdmin(caller);
+    let allApprovals = UserApproval.listApprovals(approvalState);
+    let filtered = allApprovals.filter(func(a) { a.status == #pending });
+    filtered;
+  };
+
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can save profiles");
@@ -671,14 +679,40 @@ actor {
     // Check if email is secondary admin email
     let isSecondaryAdminByEmail = secondaryAdminEmails.contains(profile.email);
 
-    // Prevent users from assigning themselves admin role unless they are secondary admin by email
-    switch (profile.appRole) {
-      case (#admin) {
-        if (not AccessControl.isAdmin(accessControlState, caller) and not isSecondaryAdminByEmail) {
-          Runtime.trap("Unauthorized: Only system admins can assign admin app role");
+    // Get existing profile to check if this is an update
+    let existingProfile = userProfiles.get(caller);
+    
+    switch (existingProfile) {
+      case (null) {
+        // NEW PROFILE CREATION: Only allow non-privileged roles unless secondary admin email
+        switch (profile.appRole) {
+          case (#admin) {
+            if (not isSecondaryAdminByEmail) {
+              Runtime.trap("Unauthorized: Cannot self-assign admin role during profile creation");
+            };
+          };
+          case (#sales or #inventoryManager or #accountant) {
+            Runtime.trap("Unauthorized: Cannot self-assign privileged roles during profile creation. Please create profile first and request role assignment from an admin.");
+          };
         };
       };
-      case (_) {};
+      case (?existing) {
+        // PROFILE UPDATE: Prevent role changes unless admin or secondary admin email
+        if (existing.appRole != profile.appRole) {
+          switch (profile.appRole) {
+            case (#admin) {
+              if (not AccessControl.isAdmin(accessControlState, caller) and not isSecondaryAdminByEmail) {
+                Runtime.trap("Unauthorized: Only admins can assign admin role");
+              };
+            };
+            case (#sales or #inventoryManager or #accountant) {
+              if (not AccessControl.isAdmin(accessControlState, caller)) {
+                Runtime.trap("Unauthorized: Only admins can change app roles. Please contact an administrator.");
+              };
+            };
+          };
+        };
+      };
     };
 
     userProfiles.add(caller, profile);
