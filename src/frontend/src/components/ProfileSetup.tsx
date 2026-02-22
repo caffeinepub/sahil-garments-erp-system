@@ -58,9 +58,9 @@ export default function ProfileSetup() {
 
     try {
       // Step 1: Save the profile
-      console.log('=== PROFILE SAVE START ===');
-      console.log('Saving profile with role:', appRole);
-      console.log('Profile data:', { name: name.trim(), email: email.trim(), department: department.trim(), appRole });
+      console.log('========== PROFILE SETUP FLOW START ==========');
+      console.log('[Profile Setup] Saving profile with role:', appRole);
+      console.log('[Profile Setup] Profile data:', { name: name.trim(), email: email.trim(), department: department.trim(), appRole });
       
       await saveProfile.mutateAsync({
         name: name.trim(),
@@ -69,7 +69,7 @@ export default function ProfileSetup() {
         appRole: appRole as AppRole,
       });
       
-      console.log('✓ Profile saved successfully to backend');
+      console.log('[Profile Setup] ✓ Profile saved successfully to backend');
       toast.success('Profile saved successfully!');
 
       // Step 2: Request approval for privileged roles
@@ -78,47 +78,56 @@ export default function ProfileSetup() {
       const isPrivilegedRole = privilegedRoles.includes(appRole as AppRole);
       
       if (isPrivilegedRole) {
-        console.log('=== APPROVAL REQUEST START ===');
-        console.log('Requesting approval for privileged role:', appRole);
+        console.log('[Profile Setup] ========== APPROVAL REQUEST START ==========');
+        console.log('[Profile Setup] Requesting approval for privileged role:', appRole);
+        console.log('[Profile Setup] Timestamp:', new Date().toISOString());
         
         try {
+          const approvalStartTime = Date.now();
           await requestApproval.mutateAsync();
-          console.log('✓ Approval request sent successfully to backend');
+          const approvalEndTime = Date.now();
+          
+          console.log(`[Profile Setup] ✓ Approval request sent successfully in ${approvalEndTime - approvalStartTime}ms`);
+          console.log('[Profile Setup] Backend should now have this request in pending state');
           toast.success('Approval request sent to administrators');
         } catch (approvalError: any) {
-          console.error('✗ Approval request failed:', approvalError);
-          console.error('Error type:', typeof approvalError);
-          console.error('Error message:', approvalError?.message);
-          console.error('Error stack:', approvalError?.stack);
+          console.error('[Profile Setup] ✗ Approval request failed');
+          console.error('[Profile Setup] Error type:', typeof approvalError);
+          console.error('[Profile Setup] Error constructor:', approvalError?.constructor?.name);
+          console.error('[Profile Setup] Error message:', approvalError?.message);
+          console.error('[Profile Setup] Error stack:', approvalError?.stack);
+          console.error('[Profile Setup] Full error object:', approvalError);
           
           const errorMsg = approvalError?.message || approvalError?.toString() || '';
           const lowerMsg = errorMsg.toLowerCase();
           
           // Check if user is already approved or already requested
           if (lowerMsg.includes('already approved') || lowerMsg.includes('already requested')) {
-            console.log('ℹ User already approved or request already pending');
+            console.log('[Profile Setup] ℹ User already approved or request already pending');
             // Don't show error for these cases
           } else {
             // Show warning but don't fail the entire flow
-            console.warn('⚠ Approval request failed but profile was saved');
+            console.warn('[Profile Setup] ⚠ Approval request failed but profile was saved');
             toast.warning('Profile saved successfully. Please request approval from an administrator to access the system.');
           }
         }
+        console.log('[Profile Setup] ========== APPROVAL REQUEST END ==========');
       } else {
-        console.log('ℹ Non-privileged role selected, no approval request needed');
+        console.log('[Profile Setup] ℹ Non-privileged role selected, no approval request needed');
       }
 
-      console.log('=== PROFILE SETUP COMPLETE ===');
+      console.log('[Profile Setup] ========== PROFILE SETUP FLOW COMPLETE ==========');
       // The App.tsx will automatically detect the profile and transition to the next screen
     } catch (error: any) {
-      console.error('=== PROFILE SAVE FAILED ===');
-      console.error('Error:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error message:', error?.message);
-      console.error('Error stack:', error?.stack);
+      console.error('[Profile Setup] ========== PROFILE SAVE FAILED ==========');
+      console.error('[Profile Setup] Error:', error);
+      console.error('[Profile Setup] Error type:', typeof error);
+      console.error('[Profile Setup] Error constructor:', error?.constructor?.name);
+      console.error('[Profile Setup] Error message:', error?.message);
+      console.error('[Profile Setup] Error stack:', error?.stack);
       
       const errorInfo = parseProfileSaveError(error);
-      console.error('Parsed error info:', errorInfo);
+      console.error('[Profile Setup] Parsed error info:', errorInfo);
       
       setErrorMessage(errorInfo.message);
       toast.error(errorInfo.message);

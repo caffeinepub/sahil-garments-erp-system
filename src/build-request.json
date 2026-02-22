@@ -1,67 +1,85 @@
 {
   "kind": "build_request",
-  "title": "Fix approval request not triggering for privileged roles",
+  "title": "Fix approval request flow - administrator not receiving requests",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the ProfileSetup component so that when a user selects a privileged role (admin, inventoryManager, or accountant) and saves their profile, the approval request is properly submitted to the backend and the user is redirected to the ApprovalPending screen",
-      "target": "frontend",
+      "text": "Verify that the backend submitApprovalRequest method correctly creates approval records in the system state when ProfileSetup component submits a request",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-6"
         ],
         "quotes": [
-          "You cannot assign privileged roles to yourself during profile creation. Please create your profile first, then contact an administrator to assign the appropriate role  request nahi aa raha hai"
+          "administrator ke pass koi request nahi aa raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "When a user selects a privileged role and clicks save, the approval request is submitted successfully",
-        "The user is redirected to the ApprovalPending screen after submitting the approval request",
-        "No error messages appear when the process completes successfully",
-        "The approval request appears in the UserManagementModule for admins to review"
+        "Approval requests are persisted in backend state when submitted from ProfileSetup",
+        "Backend logs confirm approval request creation with user details",
+        "Administrator queries return newly created approval requests"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Verify that the backend requestApproval function is correctly receiving and processing approval requests from users with privileged roles",
-      "target": "backend",
+      "text": "Ensure UserManagementModule correctly fetches and displays pending approval requests for administrators",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-6"
+        ],
+        "quotes": [
+          "administrator ke pass koi request nahi aa raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "The requestApproval backend function successfully creates approval requests",
-        "Approval requests are stored with the correct user principal and requested role",
-        "The function returns success without throwing errors for valid requests"
+        "UserManagementModule shows all pending approval requests in the UI",
+        "Pending users section displays user details including name, email, department, and requested role",
+        "List refreshes automatically or on manual trigger to show new requests"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Add comprehensive error logging in ProfileSetup to capture any failures during the approval request submission process, including network errors, backend rejections, and validation failures",
-      "target": "frontend",
+      "text": "Add comprehensive debug logging to track the full approval request lifecycle from submission through administrator retrieval",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-6"
         ]
       },
       "acceptanceCriteria": [
-        "Console logs show detailed error information if approval request fails",
-        "User sees a clear error message if the approval request cannot be submitted",
-        "Error messages distinguish between network failures, backend errors, and validation issues"
+        "Frontend logs confirmation when ProfileSetup successfully submits approval request",
+        "Backend logs when approval request is received and stored",
+        "UserManagementModule logs when fetching pending approvals and the count retrieved",
+        "Error states are logged with full context for debugging"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Verify role-based access control allows administrators to access UserManagementModule and view pending approval requests",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Primary admin users can access UserManagementModule without restrictions",
+        "Backend authorization checks pass for admin role when fetching pending users",
+        "Secondary admins are correctly restricted from accessing the module if applicable"
       ]
     }
   ],
   "constraints": [
-    "Do not modify the single-actor backend architecture",
-    "Preserve the existing approval workflow logic in ApprovalPending component",
-    "Maintain role-based access control for privileged roles"
+    "Do not modify the Internet Identity authentication flow",
+    "Preserve existing role-based access control structure",
+    "Maintain compatibility with existing ProfileSetup and ApprovalPending components"
   ],
   "nonGoals": [
-    "Changing the list of privileged roles",
-    "Modifying the admin approval interface",
-    "Altering the Internet Identity authentication flow"
+    "Redesigning the user management interface",
+    "Adding new approval workflow stages",
+    "Changing the role assignment system"
   ],
   "imageRequirements": {
     "required": [],

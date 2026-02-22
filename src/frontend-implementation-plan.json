@@ -1,43 +1,82 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix approval request not triggering for privileged roles",
+  "title": "Fix approval request flow - administrator not receiving requests",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Fix the ProfileSetup component so that when a user selects a privileged role (admin, inventoryManager, or accountant) and saves their profile, the approval request is properly submitted to the backend and the user is redirected to the ApprovalPending screen",
+      "id": "REQ-2",
+      "summary": "Ensure UserManagementModule correctly fetches and displays pending approval requests for administrators",
       "acceptanceCriteria": [
-        "When a user selects a privileged role and clicks save, the approval request is submitted successfully",
-        "The user is redirected to the ApprovalPending screen after submitting the approval request",
-        "No error messages appear when the process completes successfully",
-        "The approval request appears in the UserManagementModule for admins to review"
+        "UserManagementModule shows all pending approval requests in the UI",
+        "Pending users section displays user details including name, email, department, and requested role",
+        "List refreshes automatically or on manual trigger to show new requests"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/ProfileSetup.tsx",
+          "path": "frontend/src/components/modules/UserManagementModule.tsx",
           "operation": "modify",
-          "description": "Fix the profile submission logic to properly handle privileged roles. Ensure that when a user selects admin, inventoryManager, or accountant role, the component correctly calls requestApproval() after saving the profile with saveCallerUserProfile(). Add proper error handling to catch and log any failures during the approval request submission. Verify the flow: 1) Save profile with the selected privileged role, 2) Call requestApproval() to submit the approval request, 3) Redirect to ApprovalPending screen. Add console logging at each step to track the submission process. Ensure the component properly awaits both async calls and handles any promise rejections."
+          "description": "Add comprehensive logging to track when pending users are fetched, log the count of pending users retrieved, and ensure the UI properly displays all pending approval requests. Add error logging with full context when fetching fails. Verify that the getPendingUsers query is properly configured and not being cached incorrectly. Add a manual refresh button to force re-fetch pending users."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review and enhance the useGetPendingUsers hook to ensure it properly fetches pending approval requests. Add logging when the query executes, log the response count, and verify the query is enabled correctly for admin users. Ensure proper error handling and that stale data is being refetched appropriately. Consider adjusting cacheTime and staleTime if pending users are being cached too aggressively."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Add comprehensive error logging in ProfileSetup to capture any failures during the approval request submission process, including network errors, backend rejections, and validation failures",
+      "summary": "Add comprehensive debug logging to track the full approval request lifecycle from submission through administrator retrieval",
       "acceptanceCriteria": [
-        "Console logs show detailed error information if approval request fails",
-        "User sees a clear error message if the approval request cannot be submitted",
-        "Error messages distinguish between network failures, backend errors, and validation issues"
+        "Frontend logs confirmation when ProfileSetup successfully submits approval request",
+        "UserManagementModule logs when fetching pending approvals and the count retrieved",
+        "Error states are logged with full context for debugging"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/ProfileSetup.tsx",
           "operation": "modify",
-          "description": "Add comprehensive error logging throughout the approval request submission flow. Wrap the requestApproval() call in a try-catch block and log detailed error information including error type, message, and stack trace. Add specific error detection for network failures (check for network error patterns), backend rejections (parse backend error messages using the approvalErrors utility), and validation failures. Display user-friendly error messages that clearly explain what went wrong and suggest next steps. Include console.error() statements with context about which step failed (profile save vs approval request). Ensure error messages are displayed in the UI using the existing toast/notification system if available, or using inline error display."
+          "description": "Add comprehensive logging when the approval request is submitted via requestApproval. Log success confirmation with timestamp, log any errors with full error context, and log the user's profile details being submitted. Add logging before and after the saveCallerUserProfile call to track the full submission flow. Ensure errors are caught and logged rather than silently failing."
+        },
+        {
+          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "operation": "modify",
+          "description": "Add debug logging when the component mounts and when pending users are fetched. Log the count of pending users retrieved, log when the list is empty vs populated, and log any filtering or transformation of the pending users data. Add timestamp logging to track when data was last fetched successfully."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add logging in useRequestApproval mutation to track approval request submissions. Log when the mutation starts, when it succeeds with response details, and when it fails with full error context. Add similar logging to useGetPendingUsers to track query execution timing and results."
         },
         {
           "path": "frontend/src/utils/approvalErrors.ts",
           "operation": "modify",
-          "description": "Review and enhance the error parsing utility to ensure it properly handles all error cases from the requestApproval backend function. Add any missing error patterns specific to approval request failures. Ensure the utility can distinguish between different failure types (unauthorized, already pending, profile missing, etc.) and return appropriate user-friendly messages for each case."
+          "description": "Enhance error parsing to preserve and log original error details before normalizing them. Add logging of raw error objects to help debug unexpected error formats. Ensure all error paths are logged comprehensively."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Verify role-based access control allows administrators to access UserManagementModule and view pending approval requests",
+      "acceptanceCriteria": [
+        "Primary admin users can access UserManagementModule without restrictions",
+        "Secondary admins are correctly restricted from accessing the module if applicable"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "operation": "modify",
+          "description": "Add logging to verify role checks when the component renders. Log the user's role and admin status from bootstrap state. Log when access is denied and the reason. Verify that the useGetPendingUsers query is enabled correctly based on admin status. Add a visible indicator in the UI showing the current user's access level (primary admin vs secondary admin) for debugging purposes."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Add logging in the bootstrap state fetching to track admin role assignment and approval status. Log when bootstrap state is fetched successfully with full state details. Ensure isAdmin flag is properly set and logged. Add error logging if bootstrap state fetching fails."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review useGetBootstrapState hook to ensure admin status is properly returned and cached. Add logging when bootstrap state query executes and log the returned admin status. Verify that dependent queries like useGetPendingUsers properly depend on bootstrap state being loaded before executing."
         }
       ]
     }

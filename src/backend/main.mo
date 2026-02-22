@@ -14,6 +14,7 @@ import AccessControl "authorization/access-control";
 import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
+import Debug "mo:core/Debug";
 
 actor {
   include MixinStorage();
@@ -483,15 +484,38 @@ actor {
   };
 
   public shared ({ caller }) func requestApproval() : async () {
+    // AUTHORIZATION: Require authenticated user
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Authentication required");
     };
 
+    // AUTHORIZATION: Admins don't need approval
+    if (AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Admins do not require approval");
+    };
+
+    // AUTHORIZATION: User must have completed profile setup before requesting approval
+    switch (userProfiles.get(caller)) {
+      case (null) {
+        Runtime.trap("Unauthorized: Profile setup required before requesting approval");
+      };
+      case (?_) {};
+    };
+
+    // AUTHORIZATION: Check if already approved
     if (UserApproval.isApproved(approvalState, caller)) {
       Runtime.trap("User is already approved");
     };
 
+    // AUTHORIZATION: Check if previously rejected
+    if (previousRejectedUsers.contains(caller)) {
+      Runtime.trap("Your account has been rejected. Please contact an administrator to clear rejection status before requesting approval again.");
+    };
+
+    // Major debug output for new approval
+    Debug.print("Backend: initiating approval request for caller " # caller.toText());
     UserApproval.requestApproval(approvalState, caller);
+    Debug.print("Backend: approval request successfully created in system state for " # caller.toText());
 
     let userProfileOpt = userProfiles.get(caller);
     let userName = switch (userProfileOpt) {
@@ -499,6 +523,7 @@ actor {
       case (null) { caller.toText() };
     };
 
+    Debug.print("Backend: notifying all admins about approval request from " # userName);
     for (adminPrincipal in adminPrincipals.values()) {
       ignore createNotificationInternal(
         adminPrincipal,
@@ -506,6 +531,7 @@ actor {
         "User " # userName # " has requested approval.",
       );
     };
+    Debug.print("Backend: approval request lifecycle complete for " # caller.toText());
   };
 
   // Renamed approveUser for better clarity
@@ -523,7 +549,9 @@ actor {
       previousRejectedUsers.remove(user);
     };
 
+    Debug.print("Backend: Admin " # caller.toText() # " approving user " # user.toText());
     UserApproval.setApproval(approvalState, user, #approved);
+    Debug.print("Backend: User " # user.toText() # " approval status set to approved");
 
     switch (userAccounts.get(user)) {
       case (null) {
@@ -577,7 +605,9 @@ actor {
     };
     previousRejectedUsers.add(user);
 
+    Debug.print("Backend: Admin " # caller.toText() # " rejecting user " # user.toText());
     UserApproval.setApproval(approvalState, user, #rejected);
+    Debug.print("Backend: User " # user.toText() # " approval status set to rejected");
 
     switch (userAccounts.get(user)) {
       case (null) {
@@ -618,11 +648,21 @@ actor {
   // RESTRICTED: Only primary admins can list approvals
   public shared ({ caller }) func listApprovals() : async [UserApproval.UserApprovalInfo] {
     requirePrimaryAdmin(caller);
-    UserApproval.listApprovals(approvalState);
+    let allApprovals = UserApproval.listApprovals(approvalState);
+    let debugList = allApprovals.map(
+      func(info) {
+        {
+          principal = info.principal;
+          status = info.status;
+        };
+      }
+    );
+    Debug.print("Backend: ListApprovals triggered from active admin portal. Returning all approval requests: " # debugList.size().toText());
+    allApprovals;
   };
 
   // RESTRICTED: Only primary admins can view all user accounts
-  public shared query ({ caller }) func getAllUserAccounts() : async [UserAccount] {
+  public shared ({ caller }) func getAllUserAccounts() : async [UserAccount] {
     requirePrimaryAdmin(caller);
 
     let iter = userAccounts.values();

@@ -31,7 +31,13 @@ export function useGetBootstrapState(enablePolling = false) {
     queryKey: ['bootstrapState'],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
+      console.log('[Bootstrap] Fetching bootstrap state...');
       const bootstrap = await actor.getBootstrapState();
+      console.log('[Bootstrap] Result:', {
+        hasProfile: !!bootstrap.userProfile,
+        isApproved: bootstrap.isApproved,
+        isAdmin: bootstrap.isAdmin,
+      });
       
       // Seed individual caches to avoid redundant calls
       if (bootstrap.userProfile) {
@@ -102,12 +108,12 @@ export function useSaveCallerUserProfile() {
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
       if (!actor) throw new Error('Actor not available');
-      console.log('Calling backend saveCallerUserProfile with:', profile);
+      console.log('[Profile Save] Calling backend saveCallerUserProfile with:', profile);
       await actor.saveCallerUserProfile(profile);
-      console.log('Backend saveCallerUserProfile completed successfully');
+      console.log('[Profile Save] Backend saveCallerUserProfile completed successfully');
     },
     onSuccess: async (_, profile) => {
-      console.log('Profile save mutation onSuccess triggered');
+      console.log('[Profile Save] Mutation onSuccess triggered');
       // Invalidate all related queries
       await queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
       await queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
@@ -119,10 +125,10 @@ export function useSaveCallerUserProfile() {
       
       // Force refetch bootstrap state to update UI
       await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
-      console.log('All queries invalidated and refetched');
+      console.log('[Profile Save] All queries invalidated and refetched');
     },
     onError: (error: any) => {
-      console.error('Save profile mutation error:', error);
+      console.error('[Profile Save] Mutation error:', error);
       // Error is handled in the component
     },
   });
@@ -152,7 +158,9 @@ export function useIsSuperAdmin() {
     queryKey: ['isSuperAdmin'],
     queryFn: async () => {
       if (!actor) return false;
-      return actor.isSuperAdmin();
+      const result = await actor.isSuperAdmin();
+      console.log('[Super Admin Check] Result:', result);
+      return result;
     },
     enabled: !!actor && !isFetching,
     staleTime: LONG_STALE_TIME,
@@ -188,7 +196,9 @@ export function useCanAccessUserManagement() {
     queryKey: ['canAccessUserManagement', isAdmin, isSecondaryAdmin],
     queryFn: async () => {
       // Only primary admins (not secondary admins) can access User Management
-      return isAdmin === true && isSecondaryAdmin === false;
+      const canAccess = isAdmin === true && isSecondaryAdmin === false;
+      console.log('[User Management Access] Can access:', canAccess, { isAdmin, isSecondaryAdmin });
+      return canAccess;
     },
     enabled: isAdmin !== undefined && isSecondaryAdmin !== undefined,
     staleTime: LONG_STALE_TIME,
@@ -219,12 +229,14 @@ export function useRequestApproval() {
   return useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      console.log('Calling backend requestApproval');
+      console.log('[Approval Request] Calling backend requestApproval');
+      const startTime = Date.now();
       await actor.requestApproval();
-      console.log('Backend requestApproval completed successfully');
+      const endTime = Date.now();
+      console.log(`[Approval Request] Backend requestApproval completed successfully in ${endTime - startTime}ms`);
     },
     onSuccess: async () => {
-      console.log('Request approval mutation onSuccess triggered');
+      console.log('[Approval Request] Mutation onSuccess triggered');
       // Invalidate approval-related queries
       await queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
       await queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
@@ -233,10 +245,10 @@ export function useRequestApproval() {
       // Force refetch to update UI immediately
       await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
       await queryClient.refetchQueries({ queryKey: ['pendingUsers'] });
-      console.log('Approval queries invalidated and refetched');
+      console.log('[Approval Request] Approval queries invalidated and refetched');
     },
     onError: (error: any) => {
-      console.error('Request approval mutation error:', error);
+      console.error('[Approval Request] Mutation error:', error);
       // Error is handled in the component
     },
   });
@@ -249,7 +261,10 @@ export function useGetAllUserAccounts(enabled = true) {
     queryKey: ['allUserAccounts'],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return actor.getAllUserAccounts();
+      console.log('[User Accounts] Fetching all user accounts...');
+      const result = await actor.getAllUserAccounts();
+      console.log('[User Accounts] Fetched', result.length, 'user accounts');
+      return result;
     },
     enabled: !!actor && !isFetching && enabled,
     staleTime: SHORT_STALE_TIME,
@@ -267,10 +282,34 @@ export function useGetPendingUsers(enabled = true) {
     queryKey: ['pendingUsers'],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      console.log('Fetching pending users...');
-      const result = await actor.getPendingUsers();
-      console.log('Pending users result:', result);
-      return result;
+      console.log('[Pending Users] ========== FETCHING PENDING USERS ==========');
+      console.log('[Pending Users] Query enabled:', enabled);
+      console.log('[Pending Users] Actor available:', !!actor);
+      console.log('[Pending Users] Actor fetching:', isFetching);
+      console.log('[Pending Users] Timestamp:', new Date().toISOString());
+      
+      try {
+        const startTime = Date.now();
+        const result = await actor.getPendingUsers();
+        const endTime = Date.now();
+        
+        console.log('[Pending Users] ✓ SUCCESS - Fetched in', endTime - startTime, 'ms');
+        console.log('[Pending Users] Count:', result.length);
+        console.log('[Pending Users] Data:', result.map(u => ({
+          principal: u.principal.toString(),
+          status: u.status,
+        })));
+        console.log('[Pending Users] ========================================');
+        
+        return result;
+      } catch (error: any) {
+        console.error('[Pending Users] ✗ ERROR - Failed to fetch pending users');
+        console.error('[Pending Users] Error type:', error?.constructor?.name);
+        console.error('[Pending Users] Error message:', error?.message);
+        console.error('[Pending Users] Full error:', error);
+        console.log('[Pending Users] ========================================');
+        throw error;
+      }
     },
     enabled: !!actor && !isFetching && enabled,
     staleTime: 0, // Always fetch fresh data
@@ -290,9 +329,12 @@ export function useApproveUser() {
   return useMutation({
     mutationFn: async (user: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.approveUser(user);
+      console.log('[Approve User] Approving user:', user.toString());
+      await actor.approveUser(user);
+      console.log('[Approve User] User approved successfully');
     },
     onSuccess: () => {
+      console.log('[Approve User] Invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
@@ -301,7 +343,7 @@ export function useApproveUser() {
       toast.success('User approved successfully!');
     },
     onError: (error: any) => {
-      console.error('Approve user error:', error);
+      console.error('[Approve User] Error:', error);
       const errorMessage = error?.message || 'Failed to approve user';
       toast.error(errorMessage);
     },
@@ -316,9 +358,12 @@ export function useRejectUser() {
   return useMutation({
     mutationFn: async (user: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.rejectUser(user);
+      console.log('[Reject User] Rejecting user:', user.toString());
+      await actor.rejectUser(user);
+      console.log('[Reject User] User rejected successfully');
     },
     onSuccess: () => {
+      console.log('[Reject User] Invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
@@ -327,7 +372,7 @@ export function useRejectUser() {
       toast.success('User rejected successfully!');
     },
     onError: (error: any) => {
-      console.error('Reject user error:', error);
+      console.error('[Reject User] Error:', error);
       const errorMessage = error?.message || 'Failed to reject user';
       toast.error(errorMessage);
     },
@@ -670,67 +715,6 @@ export function useDeleteAllInventory() {
   });
 }
 
-// Inventory Queries (InventoryRecord)
-export function useListInventory() {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll, activeModule } = usePolling();
-
-  return useQuery<InventoryRecord[]>({
-    queryKey: ['inventory'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.listInventory();
-    },
-    enabled: !!actor && !isFetching,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-    refetchInterval: shouldPoll && activeModule === 'inventory' ? INVENTORY_REFRESH_INTERVAL : false,
-    refetchIntervalInBackground: false,
-  });
-}
-
-export function useGetInventoryEntry(inventoryId: bigint | null) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<InventoryRecord | null>({
-    queryKey: ['inventoryEntry', inventoryId?.toString()],
-    queryFn: async () => {
-      if (!actor || inventoryId === null) return null;
-      return actor.getInventoryEntry(inventoryId);
-    },
-    enabled: !!actor && !isFetching && inventoryId !== null,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-  });
-}
-
-export function useAddInventoryEntry() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (entry: {
-      productId: bigint;
-      quantity: bigint;
-      batch: string;
-      supplierId: bigint;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addInventoryEntry(entry.productId, entry.quantity, entry.batch, entry.supplierId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.refetchQueries({ queryKey: ['inventory'] });
-      toast.success('Inventory entry added successfully!');
-    },
-    onError: (error: any) => {
-      console.error('Add inventory entry error:', error);
-      const errorMessage = error?.message || 'Failed to add inventory entry';
-      toast.error(errorMessage);
-    },
-  });
-}
-
 // Order Queries
 export function useListOrders() {
   const { actor, isFetching } = useActor();
@@ -743,25 +727,10 @@ export function useListOrders() {
       return actor.listOrders();
     },
     enabled: !!actor && !isFetching,
-    staleTime: SHORT_STALE_TIME,
+    staleTime: MEDIUM_STALE_TIME,
     gcTime: 300000,
     refetchInterval: shouldPoll && activeModule === 'orders' ? ORDER_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
-  });
-}
-
-export function useGetOrder(orderId: bigint | null) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<OrderRecord | null>({
-    queryKey: ['order', orderId?.toString()],
-    queryFn: async () => {
-      if (!actor || orderId === null) return null;
-      return actor.getOrder(orderId);
-    },
-    enabled: !!actor && !isFetching && orderId !== null,
-    staleTime: SHORT_STALE_TIME,
-    gcTime: 300000,
   });
 }
 
@@ -823,6 +792,25 @@ export function useDeleteAllOrders() {
   });
 }
 
+// Inventory Queries
+export function useListInventory() {
+  const { actor, isFetching } = useActor();
+  const { shouldPoll, activeModule } = usePolling();
+
+  return useQuery<InventoryRecord[]>({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.listInventory();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: MEDIUM_STALE_TIME,
+    gcTime: 300000,
+    refetchInterval: shouldPoll && activeModule === 'inventory' ? INVENTORY_REFRESH_INTERVAL : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
 // Invoice Queries
 export function useListInvoices() {
   const { actor, isFetching } = useActor();
@@ -835,7 +823,7 @@ export function useListInvoices() {
       return actor.listInvoices();
     },
     enabled: !!actor && !isFetching,
-    staleTime: SHORT_STALE_TIME,
+    staleTime: MEDIUM_STALE_TIME,
     gcTime: 300000,
     refetchInterval: shouldPoll && activeModule === 'invoices' ? INVOICE_REFRESH_INTERVAL : false,
     refetchIntervalInBackground: false,
@@ -852,7 +840,7 @@ export function useGetInvoice(invoiceId: bigint | null) {
       return actor.getInvoice(invoiceId);
     },
     enabled: !!actor && !isFetching && invoiceId !== null,
-    staleTime: SHORT_STALE_TIME,
+    staleTime: MEDIUM_STALE_TIME,
     gcTime: 300000,
   });
 }
@@ -979,13 +967,13 @@ export function useMarkNotificationAsRead() {
   });
 }
 
-// Stats Query (Dashboard Metrics)
-export function useGetStats() {
+// Dashboard Metrics (alias for useGetStats)
+export function useDashboardMetrics() {
   const { actor, isFetching } = useActor();
   const { shouldPoll, activeModule } = usePolling();
 
   return useQuery<Stats>({
-    queryKey: ['stats'],
+    queryKey: ['dashboardMetrics'],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
       return actor.getStats();
@@ -998,12 +986,12 @@ export function useGetStats() {
   });
 }
 
-// Alias for backward compatibility with DashboardHome
-export function useDashboardMetrics() {
-  return useGetStats();
+// Alias for backward compatibility
+export function useGetStats() {
+  return useDashboardMetrics();
 }
 
-// Data Entries Query
+// Data Entries
 export function useListDataEntries() {
   const { actor, isFetching } = useActor();
 
@@ -1019,50 +1007,8 @@ export function useListDataEntries() {
   });
 }
 
-export function useGetDataEntry(dataEntryId: bigint | null) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<DataEntry | null>({
-    queryKey: ['dataEntry', dataEntryId?.toString()],
-    queryFn: async () => {
-      if (!actor || dataEntryId === null) return null;
-      return actor.getDataEntry(dataEntryId);
-    },
-    enabled: !!actor && !isFetching && dataEntryId !== null,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-  });
-}
-
-export function useCreateDataEntry() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (entry: {
-      entityType: string;
-      entryId: bigint;
-      amount: bigint;
-      quantity: bigint;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.createDataEntry(entry.entityType, entry.entryId, entry.amount, entry.quantity);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dataEntries'] });
-      queryClient.refetchQueries({ queryKey: ['dataEntries'] });
-      toast.success('Data entry created successfully!');
-    },
-    onError: (error: any) => {
-      console.error('Create data entry error:', error);
-      const errorMessage = error?.message || 'Failed to create data entry';
-      toast.error(errorMessage);
-    },
-  });
-}
-
-// Profit & Loss Report Query
-export function useGetProfitLossReport(startDate: Time, endDate: Time, enabled = true) {
+// Profit & Loss Report
+export function useGetProfitLossReport(startDate: Time, endDate: Time) {
   const { actor, isFetching } = useActor();
 
   return useQuery<ProfitLossReport>({
@@ -1070,22 +1016,6 @@ export function useGetProfitLossReport(startDate: Time, endDate: Time, enabled =
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
       return actor.getProfitLossReport(startDate, endDate);
-    },
-    enabled: !!actor && !isFetching && enabled,
-    staleTime: MEDIUM_STALE_TIME,
-    gcTime: 300000,
-  });
-}
-
-// Inventory Report Barcodes Query
-export function useGetInventoryReportBarcodes() {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<string[]>({
-    queryKey: ['inventoryReportBarcodes'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getInventoryReportBarcodes();
     },
     enabled: !!actor && !isFetching,
     staleTime: MEDIUM_STALE_TIME,

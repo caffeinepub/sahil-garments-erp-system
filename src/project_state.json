@@ -4,38 +4,46 @@
   "summary": "New project",
   "architectural_notes": [],
   "known_issues": [
-    "Profile creation shows role assignment restriction message but approval request is not appearing as expected"
+    "Administrator not receiving approval requests"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-the-profilesetup-component-so-that-when-a-user-selects-a-privileged-role-admin-inventorymanager-or-accountant-and-saves-their-profile-the-approval-request-is-properly-submitted-to-the-backend-and-the-user-is-redirected-to-the-approvalpending-screen",
-      "title": "Fix the ProfileSetup component so that when a user selects a privileged role (admin, inventoryManager, or accountant) and saves their profile, the approval request is properly submitted to the backend and the user is redirected to the ApprovalPending screen",
+      "id": "feature-ensure-usermanagementmodule-correctly-fetches-and-displays-pending-approval-requests-for-administrators",
+      "title": "Ensure UserManagementModule correctly fetches and displays pending approval requests for administrators",
       "reqIds": [
-        "REQ-1"
+        "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-add-comprehensive-error-logging-in-profilesetup-to-capture-any-failures-during-the-approval-request-submission-process-including-network-errors-backend-rejections-and-validation-failures",
-      "title": "Add comprehensive error logging in ProfileSetup to capture any failures during the approval request submission process, including network errors, backend rejections, and validation failures",
+      "id": "feature-add-comprehensive-debug-logging-to-track-the-full-approval-request-lifecycle-from-submission-through-administrator-retrieval",
+      "title": "Add comprehensive debug logging to track the full approval request lifecycle from submission through administrator retrieval",
       "reqIds": [
         "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-verify-role-based-access-control-allows-administrators-to-access-usermanagementmodule-and-view-pending-approval-requests",
+      "title": "Verify role-based access control allows administrators to access UserManagementModule and view pending approval requests",
+      "reqIds": [
+        "REQ-4"
       ],
       "version": 1
     }
   ],
   "new_feature_requests": [
     {
-      "id": "AR-2",
-      "summary": "Verify that the backend requestApproval function is correctly receiving and processing approval requests from users with privileged roles",
+      "id": "AR-1",
+      "summary": "Verify that the backend submitApprovalRequest method correctly creates approval records in the system state when ProfileSetup component submits a request",
       "reqIds": [
-        "REQ-2"
+        "REQ-1"
       ],
       "status": "pending"
     }
   ],
-  "projectName": "Fix approval request not triggering for privileged roles",
+  "projectName": "Fix approval request flow - administrator not receiving requests",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

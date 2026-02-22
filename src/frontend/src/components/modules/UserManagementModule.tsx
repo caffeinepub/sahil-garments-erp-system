@@ -6,11 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Loader2, Trash2, UserCheck } from 'lucide-react';
+import { Users, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Loader2, Trash2, UserCheck, RefreshCw } from 'lucide-react';
 import { UserProfile, AppRole, UserApprovalStatus } from '../../backend';
 import { Skeleton } from '@/components/ui/skeleton';
 import { parseApprovalError } from '../../utils/approvalErrors';
 import { useInternetIdentity } from '../../hooks/useInternetIdentity';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 interface UserManagementModuleProps {
   userProfile: UserProfile;
@@ -20,15 +22,18 @@ interface UserManagementModuleProps {
 
 export default function UserManagementModule({ userProfile, isAdmin, canAccessUserManagement }: UserManagementModuleProps) {
   const { identity } = useInternetIdentity();
+  const queryClient = useQueryClient();
+  
   // Only fetch user accounts if user has access
   const { data: userAccounts = [], isLoading, error } = useGetAllUserAccounts(canAccessUserManagement);
-  const { data: pendingUsers = [], isLoading: pendingLoading, error: pendingError } = useGetPendingUsers(canAccessUserManagement);
+  const { data: pendingUsers = [], isLoading: pendingLoading, error: pendingError, refetch: refetchPendingUsers } = useGetPendingUsers(canAccessUserManagement);
   const approveUser = useApproveUser();
   const rejectUser = useRejectUser();
   const removeUser = useRemoveUser();
   const assignAppRole = useAssignAppRole();
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Access control: Only primary admins can access User Management
   if (!canAccessUserManagement) {
@@ -56,6 +61,24 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
       </div>
     );
   }
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    console.log('[User Management] Manual refresh triggered');
+    try {
+      // Invalidate and refetch all user-related queries
+      await queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
+      await queryClient.invalidateQueries({ queryKey: ['allUserAccounts'] });
+      await refetchPendingUsers();
+      console.log('[User Management] Manual refresh completed');
+      toast.success('User list refreshed');
+    } catch (error) {
+      console.error('[User Management] Manual refresh failed:', error);
+      toast.error('Failed to refresh user list');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleApprove = async (userId: any) => {
     try {
@@ -184,12 +207,24 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Users className="h-8 w-8" />
-          User Management
-        </h1>
-        <p className="text-muted-foreground mt-1">Manage user approvals and roles</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Users className="h-8 w-8" />
+            User Management
+          </h1>
+          <p className="text-muted-foreground mt-1">Manage user approvals and roles</p>
+        </div>
+        <Button
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          variant="outline"
+          size="sm"
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Pending Approval Requests Section */}
@@ -215,7 +250,16 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
           ) : pendingError ? (
             <div className="text-center py-4 text-destructive">
               <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-              <p>Error loading pending users</p>
+              <p className="font-medium">Error loading pending users</p>
+              <p className="text-sm mt-1">{pendingError instanceof Error ? pendingError.message : 'Unknown error'}</p>
+              <Button
+                onClick={handleManualRefresh}
+                variant="outline"
+                size="sm"
+                className="mt-4"
+              >
+                Try Again
+              </Button>
             </div>
           ) : pendingUsers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -230,60 +274,82 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                   <TableRow>
                     <TableHead>Principal ID</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pendingUsers.map((pendingUser) => (
-                    <TableRow key={pendingUser.principal.toText()}>
-                      <TableCell className="font-mono text-sm">
-                        {pendingUser.principal.toText().slice(0, 20)}...
+                  {pendingUsers.map((user) => (
+                    <TableRow key={user.principal.toString()}>
+                      <TableCell className="font-mono text-xs">
+                        {user.principal.toString().slice(0, 20)}...
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="gap-1">
-                          <Clock className="h-3 w-3" />
-                          Pending
-                        </Badge>
+                        {getStatusBadge(user.status as UserApprovalStatus)}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleApprove(pendingUser.principal)}
-                            disabled={approveUser.isPending || rejectUser.isPending}
-                          >
-                            {approveUser.isPending ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Approving...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                      <TableCell className="text-right space-x-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="gap-1"
+                              disabled={approveUser.isPending}
+                            >
+                              {approveUser.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-3 w-3" />
+                              )}
+                              Approve
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Approve User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to approve this user? They will gain access to the system based on their assigned role.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleApprove(user.principal)}>
                                 Approve
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleReject(pendingUser.principal)}
-                            disabled={approveUser.isPending || rejectUser.isPending}
-                          >
-                            {rejectUser.isPending ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Rejecting...
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="h-3 w-3 mr-1" />
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="gap-1"
+                              disabled={rejectUser.isPending}
+                            >
+                              {rejectUser.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <XCircle className="h-3 w-3" />
+                              )}
+                              Reject
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reject User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to reject this user? They will be denied access to the system.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleReject(user.principal)}>
                                 Reject
-                              </>
-                            )}
-                          </Button>
-                        </div>
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -300,6 +366,11 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
             All Users
+            {userAccounts.length > 0 && (
+              <Badge variant="outline" className="ml-2">
+                {userAccounts.length}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -324,95 +395,20 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                     <TableHead>Department</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {userAccounts.map((account) => {
-                    const isSelf = isCurrentUser(account.id);
-                    return (
-                      <TableRow key={account.id.toText()}>
-                        <TableCell className="font-medium">
-                          {account.profile.name}
-                          {isSelf && <span className="ml-2 text-xs text-muted-foreground">(You)</span>}
-                        </TableCell>
-                        <TableCell>{account.profile.email}</TableCell>
-                        <TableCell>{account.profile.department}</TableCell>
-                        <TableCell>{getRoleBadge(account.profile.appRole)}</TableCell>
-                        <TableCell>{getStatusBadge(account.approvalStatus)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {account.approvalStatus === UserApprovalStatus.pending && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  onClick={() => handleApprove(account.id)}
-                                  disabled={approveUser.isPending || rejectUser.isPending}
-                                >
-                                  {approveUser.isPending ? (
-                                    <>
-                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                      Approving...
-                                    </>
-                                  ) : (
-                                    'Approve'
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleReject(account.id)}
-                                  disabled={approveUser.isPending || rejectUser.isPending}
-                                >
-                                  {rejectUser.isPending ? (
-                                    <>
-                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                      Rejecting...
-                                    </>
-                                  ) : (
-                                    'Reject'
-                                  )}
-                                </Button>
-                              </>
-                            )}
-                            {account.approvalStatus === UserApprovalStatus.approved && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button size="sm" variant="destructive" disabled={rejectUser.isPending}>
-                                    Reject
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle className="flex items-center gap-2">
-                                      <AlertTriangle className="h-5 w-5 text-destructive" />
-                                      Reject Approved User
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to reject {account.profile.name}? This will revoke their access to the system and they will need to request approval again.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleReject(account.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      disabled={rejectUser.isPending}
-                                    >
-                                      {rejectUser.isPending ? (
-                                        <>
-                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                          Rejecting...
-                                        </>
-                                      ) : (
-                                        'Reject User'
-                                      )}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
+                  {userAccounts.map((account) => (
+                    <TableRow key={account.id.toString()}>
+                      <TableCell className="font-medium">{account.profile.name}</TableCell>
+                      <TableCell>{account.profile.email}</TableCell>
+                      <TableCell>{account.profile.department}</TableCell>
+                      <TableCell>{getRoleBadge(account.profile.appRole)}</TableCell>
+                      <TableCell>{getStatusBadge(account.approvalStatus)}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
                             <Button
                               size="sm"
                               variant="outline"
@@ -420,129 +416,100 @@ export default function UserManagementModule({ userProfile, isAdmin, canAccessUs
                                 setSelectedUser(account);
                                 setSelectedRole(account.profile.appRole);
                               }}
-                              disabled={approveUser.isPending || rejectUser.isPending || assignAppRole.isPending}
                             >
                               Change Role
                             </Button>
-                            {isSelf ? (
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Assign Role</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Select a new role for {account.profile.name}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <div className="py-4">
+                              <Select
+                                value={selectedRole || ''}
+                                onValueChange={(value) => setSelectedRole(value as AppRole)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={AppRole.admin}>Admin</SelectItem>
+                                  <SelectItem value={AppRole.sales}>Sales</SelectItem>
+                                  <SelectItem value={AppRole.inventoryManager}>Inventory Manager</SelectItem>
+                                  <SelectItem value={AppRole.accountant}>Accountant</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => {
+                                setSelectedUser(null);
+                                setSelectedRole(null);
+                              }}>
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction onClick={handleRoleAssignment}>
+                                Assign Role
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        {!isCurrentUser(account.id) && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
                               <Button
                                 size="sm"
                                 variant="destructive"
-                                disabled
-                                title="You cannot remove your own account"
+                                className="gap-1"
+                                disabled={removeUser.isPending}
                               >
-                                <Trash2 className="h-3 w-3" />
+                                {removeUser.isPending ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3" />
+                                )}
+                                Remove
                               </Button>
-                            ) : (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    disabled={removeUser.isPending}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle className="flex items-center gap-2">
-                                      <AlertTriangle className="h-5 w-5 text-destructive" />
-                                      Remove User Permanently
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription className="space-y-2">
-                                      <p>
-                                        Are you sure you want to permanently remove <strong>{account.profile.name}</strong> ({account.profile.email})?
-                                      </p>
-                                      <p className="text-destructive font-semibold">
-                                        This action is irreversible and will permanently delete:
-                                      </p>
-                                      <ul className="list-disc list-inside text-sm space-y-1">
-                                        <li>User profile and account data</li>
-                                        <li>All associated permissions and roles</li>
-                                        <li>User's approval status and history</li>
-                                      </ul>
-                                      <p className="text-sm">
-                                        The user will be completely removed from the system and will need to create a new account to regain access.
-                                      </p>
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleRemove(account.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      disabled={removeUser.isPending}
-                                    >
-                                      {removeUser.isPending ? (
-                                        <>
-                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                          Removing...
-                                        </>
-                                      ) : (
-                                        'Remove User'
-                                      )}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                                  <AlertTriangle className="h-5 w-5" />
+                                  Permanently Remove User
+                                </AlertDialogTitle>
+                                <AlertDialogDescription className="space-y-2">
+                                  <p>
+                                    Are you sure you want to permanently remove <strong>{account.profile.name}</strong>?
+                                  </p>
+                                  <p className="text-destructive font-medium">
+                                    ⚠️ This action cannot be undone. All user data will be permanently deleted.
+                                  </p>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleRemove(account.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Remove User
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
           )}
         </CardContent>
       </Card>
-
-      {selectedUser && (
-        <AlertDialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Change User Role</AlertDialogTitle>
-              <AlertDialogDescription>
-                Update the role for {selectedUser.profile.name}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="py-4">
-              <Select
-                value={selectedRole || undefined}
-                onValueChange={(value) => setSelectedRole(value as AppRole)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={AppRole.admin}>Admin</SelectItem>
-                  <SelectItem value={AppRole.sales}>Sales</SelectItem>
-                  <SelectItem value={AppRole.inventoryManager}>Inventory Manager</SelectItem>
-                  <SelectItem value={AppRole.accountant}>Accountant</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setSelectedUser(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleRoleAssignment}
-                disabled={!selectedRole || assignAppRole.isPending}
-              >
-                {assignAppRole.isPending ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Update Role'
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
     </div>
   );
 }
