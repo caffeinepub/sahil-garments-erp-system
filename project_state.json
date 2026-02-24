@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 3,
+  "summary": "Admin panel project with secondary admin role management, user role mapping, login access, and request management features.",
+  "architectural_notes": [
+    "Secondary admin role requires: Login access, View user requests, Approve/Reject requests permissions enabled",
+    "User roles: Admin or Sub Admin with Status=Active and access to User Management and Request Management modules",
+    "Database field is_active=1 required for active accounts; request status=Pending for dashboard visibility"
+  ],
+  "known_issues": [
+    "Secondary admin account sometimes saved under normal user role instead of Admin/Sub Admin",
+    "Admin panel not showing user requests due to missing API connection or filter misconfiguration"
+  ],
+  "isFixRequest": true,
+  "existing_features": [
+    {
+      "id": "feature-in-the-user-management-admin-panel-frontend-display-each-user-s-role-status-and-assigned-access-modules-clearly-for-secondary-admin-users-show-a-visual-indicator-e-g-a-badge-or-tag-if-their-role-is-misconfigured-not-admin-sub-admin-or-their-status-is-not-active-so-administrators-can-identify-and-correct-role-mapping-issues-at-a-glance",
+      "title": "In the User Management admin panel frontend, display each user's role, status, and assigned access modules clearly. For secondary admin users, show a visual indicator (e.g., a badge or tag) if their role is misconfigured (not Admin/Sub Admin) or their status is not Active, so administrators can identify and correct role mapping issues at a glance.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-in-the-admin-dashboard-frontend-update-the-request-management-module-to-correctly-call-the-backend-api-for-user-requests-and-display-them-add-a-filter-control-allowing-admins-to-select-pending-all-or-other-relevant-statuses-ensure-the-component-re-fetches-data-on-mount-and-displays-an-empty-state-message-when-no-requests-match-the-current-filter",
+      "title": "In the admin dashboard frontend, update the Request Management module to correctly call the backend API for user requests and display them. Add a filter control allowing admins to select 'Pending', 'All', or other relevant statuses. Ensure the component re-fetches data on mount and displays an empty state message when no requests match the current filter.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Secondary admin role permission check: Login access, View user requests, Approve/Reject requests",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "User role mapping fix: Ensure secondary admin is saved as Admin/Sub Admin with correct status and access modules",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Login problem fix: Password reset, account block check, email/username validation, is_active=1 in database",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Fix requests not showing in admin panel: Check request table data, ensure API connected, filter by Pending/All requests",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "In the backend, ensure the secondary admin role definition includes the following permissions explicitly set to enabled: Login Access, View User Requests, and Approve/Reject Requests. These permissions must be stored and enforced as part of the role's access control configuration.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Fix the user role mapping bug where a secondary admin account is sometimes persisted with the normal user role instead of Admin or Sub Admin. When creating or updating a secondary admin user, validate that the role is set to 'Admin' or 'Sub Admin', status is set to 'Active', and access modules include 'User Management' and 'Request Management' before saving.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-8",
+      "summary": "In the backend, ensure that user requests (approval/pending requests) are correctly fetched and returned via the admin API. Verify that the query for pending requests filters by status = Pending and returns all relevant request data. Expose or fix the existing endpoint so that the admin dashboard's Request Management module can retrieve and display pending user requests.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "status": "pending"
+    }
+  ],
+  "gameProjectType": "none",
+  "projectName": "Admin Panel",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}

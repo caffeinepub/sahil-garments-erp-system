@@ -1,0 +1,57 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-in-the-user-management-admin-panel-frontend-display-each-user-s-role-status-and-assigned-access-modules-clearly-for-secondary-admin-users-show-a-visual-indicator-e-g-a-badge-or-tag-if-their-role-is-misconfigured-not-admin-sub-admin-or-their-status-is-not-active-so-administrators-can-identify-and-correct-role-mapping-issues-at-a-glance",
+      "featureTitle": "In the User Management admin panel frontend, display each user's role, status, and assigned access modules clearly. For secondary admin users, show a visual indicator (e.g., a badge or tag) if their role is misconfigured (not Admin/Sub Admin) or their status is not Active, so administrators can identify and correct role mapping issues at a glance.",
+      "files": [
+        "frontend/src/components/modules/UserManagementModule.tsx",
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "qr-code@1.0.0",
+        "http-outcalls@3.0.0",
+        "user-approval@3.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-in-the-admin-dashboard-frontend-update-the-request-management-module-to-correctly-call-the-backend-api-for-user-requests-and-display-them-add-a-filter-control-allowing-admins-to-select-pending-all-or-other-relevant-statuses-ensure-the-component-re-fetches-data-on-mount-and-displays-an-empty-state-message-when-no-requests-match-the-current-filter",
+      "featureTitle": "In the admin dashboard frontend, update the Request Management module to correctly call the backend API for user requests and display them. Add a filter control allowing admins to select 'Pending', 'All', or other relevant statuses. Ensure the component re-fetches data on mount and displays an empty state message when no requests match the current filter.",
+      "files": [
+        "frontend/src/components/Sidebar.tsx",
+        "frontend/src/components/modules/RequestManagementModule.tsx",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/Dashboard.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "qr-code@1.0.0",
+        "http-outcalls@3.0.0",
+        "user-approval@3.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-5"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

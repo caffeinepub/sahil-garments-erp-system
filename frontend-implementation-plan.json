@@ -1,0 +1,63 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Secondary Admin Role Permissions & User Role Mapping Fix - Frontend",
+  "requirements": [
+    {
+      "id": "REQ-3",
+      "summary": "Display user role, status, and access modules in User Management panel with visual indicators for misconfigured secondary admin accounts",
+      "acceptanceCriteria": [
+        "The User Management module displays a 'Role' column showing the user's current role",
+        "The User Management module displays a 'Status' column showing Active/Inactive",
+        "The User Management module displays assigned access modules for each user",
+        "Users with a misconfigured role (expected Admin/Sub Admin but saved as User) are visually highlighted with a warning badge",
+        "Admins can see at a glance which secondary admin accounts have incorrect role mappings"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "operation": "modify",
+          "description": "Extend the user list display to include role, status, and access modules columns. Add logic to detect misconfigured secondary admin accounts (those with role !== 'Admin' or 'Sub Admin' when expected) and display a warning badge or alert icon next to their entries. Fetch additional user metadata from the backend if needed to determine expected vs actual roles. Ensure the table remains responsive and the visual indicators are clear."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add or extend queries to fetch user role mappings, status information, and access modules for all users in the system. Ensure the listApprovals query includes all necessary user metadata (role, status, access modules) or add a new query hook if the existing backend method returns insufficient data. Configure appropriate caching and refetch strategies for this admin-only data."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Update Request Management module to fetch and display user requests with status filter and empty state handling",
+      "acceptanceCriteria": [
+        "The Request Management module displays user requests fetched from the backend",
+        "A filter control exists with options: 'All', 'Pending', and other relevant statuses",
+        "Selecting 'Pending' filters the list to show only pending requests",
+        "The list refreshes on module load",
+        "An empty state message is shown when no requests match the filter"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/modules/RequestManagementModule.tsx",
+          "operation": "create",
+          "description": "Create a new Request Management module component that fetches user requests from the backend on mount. Implement a filter dropdown with options for 'All', 'Pending', and any other relevant request statuses. Display requests in a table or list format showing request details, status, and timestamps. Include an empty state message when no requests match the selected filter. Ensure the component re-fetches data when mounted and provides manual refresh capability. Restrict access to Admin and Sub Admin roles."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add a new query hook (e.g., useUserRequests) to fetch user requests from the backend. The hook should accept optional filter parameters (status filter) and support query invalidation for manual refresh. Configure polling if real-time updates are needed for the Request Management module. Use the existing backend method for fetching pending or all user requests."
+        },
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Wire the new RequestManagementModule into the dashboard routing system. Add a route case for 'request-management' and lazy-load the RequestManagementModule component. Ensure the route is accessible only to Admin and Sub Admin roles using existing role-based access control logic."
+        },
+        {
+          "path": "frontend/src/components/Sidebar.tsx",
+          "operation": "modify",
+          "description": "Add a navigation menu item for 'Request Management' in the sidebar. Position it appropriately within the admin section, visible only to Admin and Sub Admin roles. Use an appropriate icon (e.g., from existing assets like generated/user-approval-icon-transparent.dim_64x64.png) and ensure the menu item highlights when the request-management route is active."
+        }
+      ]
+    }
+  ]
+}
