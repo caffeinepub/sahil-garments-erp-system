@@ -1,34 +1,46 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix: Approval requests not loading in Request Management module",
+  "title": "Fix 'Complete Your Profile' setup flow not completing",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix the Request Management module to properly fetch, display, and update user approval requests with correct loading, error, and empty states",
+      "summary": "Investigate and fix the ProfileSetup form so that submitting profile information successfully saves the profile and advances the user past the setup screen",
       "acceptanceCriteria": [
-        "Admin users can see the list of approval requests in the Request Management module without errors",
-        "Pending requests are displayed with correct user details (name, email, role, department)",
-        "The module shows an appropriate empty state message when there are no requests",
-        "Loading spinner is shown while requests are being fetched",
-        "Error state is shown with a retry option if the fetch fails",
-        "Approving or rejecting a request updates the list immediately without requiring a page refresh"
+        "User can fill in all required fields (name, email, department, role) in the ProfileSetup form",
+        "Submitting the form does not leave the user stuck on the profile setup screen",
+        "After successful submission, user is navigated to the correct next state: approval pending screen (for roles requiring approval) or dashboard (for roles that do not require approval)",
+        "Error messages are displayed clearly if submission fails",
+        "No console errors or unhandled promise rejections occur during the profile setup flow"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/components/ProfileSetup.tsx",
           "operation": "modify",
-          "description": "Review and fix the useGetApprovalRequests hook to ensure it properly fetches data from the backend getApprovalRequests method. Verify the query is enabled when the actor is available, has correct error handling, and invalidates on success after approval/rejection mutations. Ensure the hook returns all necessary loading/error states that the UI components depend on."
+          "description": "Fix the form submission handler to properly handle the saveCallerUserProfile mutation completion. Ensure that after a successful profile save, the component invalidates the bootstrap state query and triggers a refetch. Add proper error handling with user-friendly error messages displayed in the UI. Verify that the form properly awaits both the saveCallerUserProfile call and the requestApproval call (if needed) before considering the submission complete. Add loading state management to prevent double-submissions."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen",
+      "acceptanceCriteria": [
+        "After profile save completes successfully, bootstrap data is invalidated and re-fetched",
+        "App.tsx transitions to the correct screen based on the updated bootstrap state",
+        "User is never stuck in a loop returning to ProfileSetup after already submitting their profile",
+        "ApprovalPending screen is shown for roles that require admin approval",
+        "Dashboard is shown for roles that do not require admin approval"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Review and fix the onboarding flow logic that determines whether to show ProfileSetup, ApprovalPending, or Dashboard. Ensure that the component properly reacts to changes in the bootstrap state after profile submission. Verify that the useGetBootstrapState query is being used correctly and that its data is up-to-date when making routing decisions. Add logic to ensure that once a profile exists (userProfile is not null), the user is never shown ProfileSetup again. Ensure the condition checks are ordered correctly: first check if userProfile exists, then check approval status, then route accordingly. Add proper handling for the case where bootstrap data is refetching after profile save."
         },
         {
-          "path": "frontend/src/components/modules/RequestManagementModule.tsx",
-          "operation": "modify",
-          "description": "Fix the Request Management module to properly handle all loading, error, and empty states from the useGetApprovalRequests hook. Ensure the component displays a loading spinner when isLoading is true, shows an error message with a retry button when an error occurs, displays an appropriate empty state message when the requests array is empty but loaded successfully, and properly renders the full list of approval requests with user profile details (name, email, role, department) when data is available. Verify that approving or rejecting a request immediately updates the displayed list through query invalidation. Add defensive checks to handle cases where user profile data might be missing or incomplete."
-        },
-        {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Review and enhance the useApproveUser and useRejectUser mutation hooks to ensure they properly invalidate the 'approvalRequests' query cache on success, triggering an immediate refresh of the Request Management module UI without requiring a page reload. Verify that error handling provides clear user feedback through toast notifications."
+          "description": "Review the useSaveCallerUserProfile mutation hook to ensure it properly invalidates the bootstrap state query key after a successful profile save. Add explicit query invalidation for ['bootstrapState'] in the onSuccess callback of the mutation. Verify that the mutation is configured to await the invalidation before resolving. Ensure proper error propagation so ProfileSetup can catch and display errors."
         }
       ]
     }

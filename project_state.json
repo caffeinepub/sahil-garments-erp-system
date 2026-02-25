@@ -1,33 +1,41 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
+  "summary": "App with profile completion/setup flow that is not working correctly",
   "architectural_notes": [],
   "known_issues": [
-    "Requests are not appearing/loading in the app (reported by user in Hindi: 'Request nahi aa raha hai')"
+    "'Complete Your Profile' / complete setup flow is not working (user reported it is not completing)"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-investigate-and-fix-the-issue-where-user-approval-requests-are-not-appearing-loading-in-the-request-management-module-ensure-the-list-of-pending-approved-and-rejected-requests-renders-correctly-for-admin-users-including-proper-data-fetching-error-handling-and-loading-states",
-      "title": "Investigate and fix the issue where user approval requests are not appearing/loading in the Request Management module. Ensure the list of pending, approved, and rejected requests renders correctly for admin users, including proper data fetching, error handling, and loading states.",
+      "id": "feature-investigate-and-fix-the-profilesetup-form-so-that-submitting-profile-information-name-email-department-role-successfully-saves-the-profile-and-advances-the-user-past-the-setup-screen-to-the-next-appropriate-state-approval-pending-or-dashboard",
+      "title": "Investigate and fix the ProfileSetup form so that submitting profile information (name, email, department, role) successfully saves the profile and advances the user past the setup screen to the next appropriate state (approval pending or dashboard).",
       "reqIds": [
         "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-app-tsx-onboarding-flow-routing-so-that-after-a-profile-is-saved-via-profilesetup-the-bootstrap-state-is-re-fetched-and-the-user-is-correctly-transitioned-away-from-the-profile-setup-screen-ensure-the-condition-that-decides-whether-to-show-profilesetup-approvalpending-or-the-dashboard-is-evaluated-correctly-after-the-profile-save-mutation-completes",
+      "title": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen. Ensure the condition that decides whether to show ProfileSetup, ApprovalPending, or the Dashboard is evaluated correctly after the profile save mutation completes.",
+      "reqIds": [
+        "REQ-2"
       ],
       "version": 1
     }
   ],
   "new_feature_requests": [
     {
-      "id": "AR-2",
-      "summary": "Verify and fix the backend query that returns user approval requests. Ensure the `getApprovalRequests` (or equivalent) backend function returns all requests correctly and is not filtering out valid entries due to a logic bug or stale state after upgrade.",
+      "id": "AR-3",
+      "summary": "Audit the backend saveProfile (or equivalent) endpoint in main.mo to ensure it correctly persists the user's profile data and returns a success response. Verify that the profile is associated with the caller's principal and that the stored profile is reflected in subsequent bootstrap/getProfile calls.",
       "reqIds": [
-        "REQ-2"
+        "REQ-3"
       ],
       "status": "pending"
     }
   ],
-  "projectName": "Fix: Approval requests not loading in Request Management module",
+  "projectName": "Sahil Garments ERP",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

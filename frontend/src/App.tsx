@@ -23,6 +23,7 @@ export default function App() {
     data: bootstrapState,
     isLoading: bootstrapLoading,
     isFetched: bootstrapFetched,
+    isRefetching: bootstrapRefetching,
     error: bootstrapError,
     refetch: refetchBootstrap,
   } = useGetBootstrapState();
@@ -47,7 +48,8 @@ export default function App() {
     return <LoginPage />;
   }
 
-  if (bootstrapLoading || !bootstrapFetched) {
+  // Show loading shell while bootstrap data is being fetched or refetched
+  if (bootstrapLoading || !bootstrapFetched || bootstrapRefetching) {
     return <AuthenticatedAppShell isLoading={true} />;
   }
 
@@ -74,10 +76,13 @@ export default function App() {
     );
   }
 
+  // If no profile exists yet, show profile setup
   if (!bootstrapState.userProfile) {
     return <ProfileSetup />;
   }
 
+  // Profile exists — check approval status
+  // Admins are always approved
   if (!bootstrapState.isAdmin && !bootstrapState.isApproved) {
     return <ApprovalPending userProfile={bootstrapState.userProfile} />;
   }

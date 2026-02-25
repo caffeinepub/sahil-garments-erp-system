@@ -1,56 +1,77 @@
 {
   "kind": "build_request",
-  "title": "Fix: Approval requests not loading in Request Management module",
+  "title": "Fix 'Complete Your Profile' setup flow not completing",
+  "projectName": "Sahil Garments ERP",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Investigate and fix the issue where user approval requests are not appearing/loading in the Request Management module. Ensure the list of pending, approved, and rejected requests renders correctly for admin users, including proper data fetching, error handling, and loading states.",
-      "target": "both",
+      "text": "Investigate and fix the ProfileSetup form so that submitting profile information (name, email, department, role) successfully saves the profile and advances the user past the setup screen to the next appropriate state (approval pending or dashboard).",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-6"
         ],
         "quotes": [
-          "Request nahi aa raha hai"
+          "complete your profile complete setup nahi ho raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "Admin users can see the list of approval requests in the Request Management module without errors",
-        "Pending requests are displayed with correct user details (name, email, role, department)",
-        "The module shows an appropriate empty state message when there are no requests",
-        "Loading spinner is shown while requests are being fetched",
-        "Error state is shown with a retry option if the fetch fails",
-        "Approving or rejecting a request updates the list immediately without requiring a page refresh"
+        "User can fill in all required fields (name, email, department, role) in the ProfileSetup form",
+        "Submitting the form does not leave the user stuck on the profile setup screen",
+        "After successful submission, user is navigated to the correct next state: approval pending screen (for roles requiring approval) or dashboard (for roles that do not require approval)",
+        "Error messages are displayed clearly if submission fails",
+        "No console errors or unhandled promise rejections occur during the profile setup flow"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Verify and fix the backend query that returns user approval requests. Ensure the `getApprovalRequests` (or equivalent) backend function returns all requests correctly and is not filtering out valid entries due to a logic bug or stale state after upgrade.",
-      "target": "backend",
+      "text": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen. Ensure the condition that decides whether to show ProfileSetup, ApprovalPending, or the Dashboard is evaluated correctly after the profile save mutation completes.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-6"
         ],
         "quotes": [
-          "Request nahi aa raha hai"
+          "complete your profile complete setup nahi ho raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "Backend returns all stored approval requests when queried by an admin principal",
-        "No runtime trap or silent empty result is returned when requests exist in stable storage",
-        "Newly submitted approval requests are immediately visible in subsequent query results"
+        "After profile save completes successfully, bootstrap data is invalidated and re-fetched",
+        "App.tsx transitions to the correct screen based on the updated bootstrap state",
+        "User is never stuck in a loop returning to ProfileSetup after already submitting their profile",
+        "ApprovalPending screen is shown for roles that require admin approval",
+        "Dashboard is shown for roles that do not require admin approval"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Audit the backend saveProfile (or equivalent) endpoint in main.mo to ensure it correctly persists the user's profile data and returns a success response. Verify that the profile is associated with the caller's principal and that the stored profile is reflected in subsequent bootstrap/getProfile calls.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "complete your profile complete setup nahi ho raha hai"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Calling saveProfile with valid data persists the profile for the caller's principal",
+        "A subsequent getBootstrap or getProfile call returns the saved profile data",
+        "saveProfile returns a clear error variant if required fields are missing or invalid",
+        "No trap or unhandled error occurs during profile save"
       ]
     }
   ],
   "constraints": [
-    "Do not change the authentication flow or Internet Identity integration",
-    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui"
+    "Do not modify files listed in frontend.immutablePaths: useInternetIdentity.ts, useActor.ts, main.tsx, and frontend/src/components/ui",
+    "Keep all Motoko logic in backend/main.mo (single-actor architecture)"
   ],
   "nonGoals": [
-    "Adding new features to the Request Management module",
-    "Changing the approval workflow or role permission model",
-    "UI redesign of the Request Management module"
+    "Changing the visual design or layout of the ProfileSetup form",
+    "Adding new profile fields beyond what already exists",
+    "Modifying the approval/rejection logic in RequestManagementModule or UserManagementModule"
   ],
   "imageRequirements": {
     "required": [],

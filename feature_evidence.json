@@ -2,11 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-investigate-and-fix-the-issue-where-user-approval-requests-are-not-appearing-loading-in-the-request-management-module-ensure-the-list-of-pending-approved-and-rejected-requests-renders-correctly-for-admin-users-including-proper-data-fetching-error-handling-and-loading-states",
-      "featureTitle": "Investigate and fix the issue where user approval requests are not appearing/loading in the Request Management module. Ensure the list of pending, approved, and rejected requests renders correctly for admin users, including proper data fetching, error handling, and loading states.",
+      "featureId": "feature-investigate-and-fix-the-profilesetup-form-so-that-submitting-profile-information-name-email-department-role-successfully-saves-the-profile-and-advances-the-user-past-the-setup-screen-to-the-next-appropriate-state-approval-pending-or-dashboard",
+      "featureTitle": "Investigate and fix the ProfileSetup form so that submitting profile information (name, email, department, role) successfully saves the profile and advances the user past the setup screen to the next appropriate state (approval pending or dashboard).",
       "files": [
-        "frontend/src/components/modules/RequestManagementModule.tsx",
-        "frontend/src/hooks/useQueries.ts"
+        "frontend/src/components/ProfileSetup.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -23,6 +22,31 @@
       ],
       "testIds": [
         "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-the-app-tsx-onboarding-flow-routing-so-that-after-a-profile-is-saved-via-profilesetup-the-bootstrap-state-is-re-fetched-and-the-user-is-correctly-transitioned-away-from-the-profile-setup-screen-ensure-the-condition-that-decides-whether-to-show-profilesetup-approvalpending-or-the-dashboard-is-evaluated-correctly-after-the-profile-save-mutation-completes",
+      "featureTitle": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen. Ensure the condition that decides whether to show ProfileSetup, ApprovalPending, or the Dashboard is evaluated correctly after the profile save mutation completes.",
+      "files": [
+        "frontend/src/App.tsx",
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "qr-code@1.0.0",
+        "http-outcalls@3.0.0",
+        "user-approval@3.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-2"
       ],
       "confidence": "high"
     }

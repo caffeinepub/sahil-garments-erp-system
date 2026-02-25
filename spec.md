@@ -1,14 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the Request Management module so that approval requests load and display correctly for admin users.
+**Goal:** Fix the "Complete Your Profile" setup flow so that submitting the profile form successfully saves the data and navigates the user to the correct next screen.
 
 **Planned changes:**
-- Investigate and fix the backend `getApprovalRequests` (or equivalent) function to ensure it correctly returns all stored approval requests without silent empty results or runtime traps
-- Fix data fetching in the frontend Request Management module so pending, approved, and rejected requests render correctly
-- Add proper loading spinner while requests are being fetched
-- Add error state with a retry option if the fetch fails
-- Add appropriate empty state message when no requests exist
-- Ensure approving or rejecting a request updates the list immediately without a page refresh
+- Fix the ProfileSetup form submission so it correctly saves name, email, department, and role without leaving the user stuck on the setup screen
+- Fix App.tsx onboarding routing to invalidate and re-fetch bootstrap data after profile save, then transition to either the ApprovalPending screen or Dashboard based on updated state
+- Audit and fix the backend `saveProfile` endpoint in main.mo to ensure it persists profile data for the caller's principal and returns a proper success/error response that is reflected in subsequent bootstrap/getProfile calls
+- Display clear error messages if profile submission fails
 
-**User-visible outcome:** Admin users can open the Request Management module and see all approval requests (pending, approved, rejected) with correct user details, along with proper loading, empty, and error states.
+**User-visible outcome:** Users can complete the profile setup form and are automatically moved to either the approval pending screen or the dashboard, without being stuck on the setup screen.

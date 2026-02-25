@@ -63,9 +63,11 @@ export function useSaveCallerUserProfile() {
       if (!actor) throw new Error('Actor not available');
       return actor.saveCallerUserProfile(profile);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Invalidate and immediately refetch bootstrap state so App.tsx transitions correctly
+      await queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+      await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
       queryClient.invalidateQueries({ queryKey: ['allUserProfiles'] });
     },
   });
@@ -133,9 +135,10 @@ export function useRequestApproval() {
       if (!actor) throw new Error('Actor not available');
       return actor.requestApproval();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
-      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
+      await queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+      await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
     },
   });
 }
@@ -366,7 +369,8 @@ export function useAddProduct() {
   return useMutation({
     mutationFn: async (params: {
       name: string; description: string; price: bigint; stockLevel: bigint;
-      warehouse: string; rack: string; shelf: string; size: string; color: string; barcode: string;
+      warehouse: string; rack: string; shelf: string; size: string; color: string;
+      barcode: string;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.addProduct(
@@ -502,7 +506,7 @@ export function useDeleteAllOrders() {
   });
 }
 
-// ─── Inventory ────────────────────────────────────────────────────────────────
+// ─── Inventory Records ────────────────────────────────────────────────────────
 
 export function useListInventory() {
   const { actor, isFetching } = useActor();
@@ -592,20 +596,6 @@ export function useStockAdjustInvoice() {
   });
 }
 
-export function useClearAllInvoices() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.clearAllInvoices();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-    },
-  });
-}
-
 export function useUpdateInvoiceDocumentUrls() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -613,6 +603,20 @@ export function useUpdateInvoiceDocumentUrls() {
     mutationFn: async (params: { invoiceId: bigint; imageUrl: string | null; pdfUrl: string | null }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.updateInvoiceDocumentUrls(params.invoiceId, params.imageUrl, params.pdfUrl);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+}
+
+export function useClearAllInvoices() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.clearAllInvoices();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -643,6 +647,7 @@ export function useListNotifications() {
       return actor.listNotifications();
     },
     enabled: !!actor && !isFetching,
+    refetchInterval: 30000,
   });
 }
 
@@ -678,10 +683,10 @@ export function useDeleteNotification() {
 
 export function useGetStats() {
   const { actor, isFetching } = useActor();
-  return useQuery<Stats | null>({
+  return useQuery<Stats>({
     queryKey: ['stats'],
     queryFn: async () => {
-      if (!actor) return null;
+      if (!actor) throw new Error('Actor not available');
       return actor.getStats();
     },
     enabled: !!actor && !isFetching,
@@ -693,10 +698,10 @@ export const useDashboardMetrics = useGetStats;
 
 export function useGetProfitLossReport(startDate: bigint, endDate: bigint) {
   const { actor, isFetching } = useActor();
-  return useQuery<ProfitLossReport | null>({
+  return useQuery<ProfitLossReport>({
     queryKey: ['profitLossReport', startDate.toString(), endDate.toString()],
     queryFn: async () => {
-      if (!actor) return null;
+      if (!actor) throw new Error('Actor not available');
       return actor.getProfitLossReport(startDate, endDate);
     },
     enabled: !!actor && !isFetching,

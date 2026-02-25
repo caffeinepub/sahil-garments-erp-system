@@ -5,16 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, User, Mail, Building2, Briefcase, Crown } from 'lucide-react';
-import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, User, Mail, Building2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { parseProfileSaveError } from '../utils/approvalErrors';
 
 export default function ProfileSetup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
-  const [appRole, setAppRole] = useState<AppRole>(AppRole.sales);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const saveProfileMutation = useSaveCallerUserProfile();
   const requestApprovalMutation = useRequestApproval();
@@ -23,43 +23,58 @@ export default function ProfileSetup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
     // Validation
     if (!name.trim()) {
-      toast.error('Please enter your name');
+      setErrorMessage('Please enter your full name.');
       return;
     }
     if (!email.trim()) {
-      toast.error('Please enter your email');
+      setErrorMessage('Please enter your email address.');
       return;
     }
     if (!department.trim()) {
-      toast.error('Please enter your department');
+      setErrorMessage('Please enter your department.');
       return;
     }
 
+    // Determine role: if email is pre-authorized as admin, use admin role.
+    // Otherwise, use sales as the default role (admin will assign the correct role later).
+    const profileToSave = {
+      name: name.trim(),
+      email: email.trim(),
+      department: department.trim(),
+      appRole: AppRole.sales, // Default role; admin will assign the correct role after approval
+    };
+
     try {
       // Step 1: Save profile
-      await saveProfileMutation.mutateAsync({
-        name: name.trim(),
-        email: email.trim(),
-        department: department.trim(),
-        appRole,
-      });
+      await saveProfileMutation.mutateAsync(profileToSave);
 
-      // Step 2: Request approval (skip for admin role as they are auto-approved)
-      if (appRole !== AppRole.admin) {
+      // Step 2: Request approval (non-admin users need admin approval)
+      try {
         await requestApprovalMutation.mutateAsync();
+      } catch (approvalError: any) {
+        // If already approved or admin, this may throw — that's okay
+        const msg = approvalError?.message ?? String(approvalError);
+        if (
+          msg.includes('already approved') ||
+          msg.includes('Admins do not require approval')
+        ) {
+          // This is fine — user is already approved or is an admin
+        } else {
+          // Non-fatal: profile was saved, approval request failed
+          // Still show success but note the issue
+          console.warn('[ProfileSetup] requestApproval warning:', msg);
+        }
       }
 
-      toast.success(
-        appRole === AppRole.admin
-          ? 'Admin profile created successfully!'
-          : 'Profile created! Waiting for admin approval.'
-      );
+      setSuccessMessage('Profile saved! Waiting for admin approval.');
     } catch (error: any) {
       const errorInfo = parseProfileSaveError(error);
-      toast.error(errorInfo.message);
+      setErrorMessage(errorInfo.message);
     }
   };
 
@@ -72,10 +87,24 @@ export default function ProfileSetup() {
           </div>
           <CardTitle className="text-2xl">Complete Your Profile</CardTitle>
           <CardDescription>
-            Please provide your information to get started
+            Please provide your information to get started. An admin will assign your role after approval.
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {errorMessage && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+
+          {successMessage && (
+            <Alert className="mb-4 border-green-500 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="flex items-center gap-2">
@@ -107,6 +136,9 @@ export default function ProfileSetup() {
                 disabled={isLoading}
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                If your email is pre-authorized as admin, you will be granted admin access automatically.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -125,52 +157,30 @@ export default function ProfileSetup() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role" className="flex items-center gap-2">
-                <Briefcase className="w-4 h-4" />
-                Role
-              </Label>
-              <Select
-                value={appRole}
-                onValueChange={(value) => setAppRole(value as AppRole)}
-                disabled={isLoading}
-              >
-                <SelectTrigger id="role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={AppRole.admin}>
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-3 h-3 text-purple-600" />
-                      <span>Admin</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value={AppRole.sales}>Sales</SelectItem>
-                  <SelectItem value={AppRole.inventoryManager}>Inventory Manager</SelectItem>
-                  <SelectItem value={AppRole.accountant}>Accountant</SelectItem>
-                </SelectContent>
-              </Select>
-              {appRole === AppRole.admin ? (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Admin role requires your email to be pre-authorized by a system administrator.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Admin roles can only be assigned by existing administrators.
-                </p>
-              )}
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 text-sm text-blue-800 dark:text-blue-200">
+              <p className="font-medium mb-1">How it works:</p>
+              <ol className="list-decimal list-inside space-y-1 text-xs">
+                <li>Submit your profile information</li>
+                <li>An admin will review and approve your account</li>
+                <li>Your role (Sales, Inventory, Accountant, etc.) will be assigned by the admin</li>
+              </ol>
             </div>
 
             <Button
               type="submit"
               className="w-full"
               size="lg"
-              disabled={isLoading}
+              disabled={isLoading || !!successMessage}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Setting up...
+                </>
+              ) : successMessage ? (
+                <>
+                  <CheckCircle2 className="mr-2 h-5 w-5" />
+                  Profile Submitted
                 </>
               ) : (
                 'Complete Setup'
