@@ -1,219 +1,209 @@
-import { useState } from 'react';
-import { useListSecondaryAdminEmails, useAddSecondaryAdminEmail, useRemoveSecondaryAdminEmail } from '../../hooks/useQueries';
+import React, { useState } from 'react';
+import { toast } from 'sonner';
+import { Shield, Plus, Trash2, RefreshCw, Mail, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, Trash2, Plus, Shield, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  useListSecondaryAdminEmails,
+  useAddSecondaryAdminEmail,
+  useRemoveSecondaryAdminEmail,
+} from '../../hooks/useQueries';
+import { AppBootstrapState } from '../../backend';
 
-export default function SecondaryAdminAllowlistModule() {
-  const { data: emails = [], isLoading, error, refetch } = useListSecondaryAdminEmails();
+interface SecondaryAdminAllowlistModuleProps {
+  bootstrapData: AppBootstrapState | null;
+}
+
+export default function SecondaryAdminAllowlistModule({ bootstrapData }: SecondaryAdminAllowlistModuleProps) {
+  // Only primary admins (isAdmin flag from backend) can manage the allowlist
+  const isPrimaryAdmin = bootstrapData?.isAdmin === true;
+
+  const { data: emails = [], isLoading, refetch } = useListSecondaryAdminEmails();
   const addEmailMutation = useAddSecondaryAdminEmail();
   const removeEmailMutation = useRemoveSecondaryAdminEmail();
 
   const [newEmail, setNewEmail] = useState('');
-  const [emailToRemove, setEmailToRemove] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState('');
+  const [removeConfirmEmail, setRemoveConfirmEmail] = useState<string | null>(null);
 
-  const handleAddEmail = async () => {
-    const trimmedEmail = newEmail.trim().toLowerCase();
-    
-    if (!trimmedEmail) {
-      toast.error('Please enter an email address');
-      return;
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-
-    if (emails.includes(trimmedEmail)) {
-      toast.error('This email is already in the secondary admin list');
-      return;
-    }
-
-    try {
-      await addEmailMutation.mutateAsync(trimmedEmail);
-      toast.success('Secondary admin email added successfully');
-      setNewEmail('');
-      refetch();
-    } catch (err: any) {
-      console.error('Failed to add secondary admin email:', err);
-      toast.error(err.message || 'Failed to add secondary admin email');
-    }
-  };
-
-  const handleRemoveEmail = async () => {
-    if (!emailToRemove) return;
-
-    try {
-      await removeEmailMutation.mutateAsync(emailToRemove);
-      toast.success('Secondary admin email removed successfully');
-      setEmailToRemove(null);
-      refetch();
-    } catch (err: any) {
-      console.error('Failed to remove secondary admin email:', err);
-      toast.error(err.message || 'Failed to remove secondary admin email');
-    }
-  };
-
-  if (isLoading) {
+  if (!isPrimaryAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-600" />
-          <p className="text-sm text-muted-foreground">Loading secondary admin settings...</p>
+          <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground">Access denied. Primary admin privileges required.</p>
+          <p className="text-xs text-muted-foreground mt-1">Only the primary system admin can manage the secondary admin allowlist.</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="p-4">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Failed to load secondary admin settings. {error instanceof Error ? error.message : 'Unknown error'}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleAddEmail = async () => {
+    setEmailError('');
+    if (!newEmail.trim()) {
+      setEmailError('Email address is required');
+      return;
+    }
+    if (!validateEmail(newEmail.trim())) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    if (emails.includes(newEmail.trim().toLowerCase())) {
+      setEmailError('This email is already in the allowlist');
+      return;
+    }
+
+    try {
+      await addEmailMutation.mutateAsync(newEmail.trim().toLowerCase());
+      toast.success(`${newEmail.trim()} added to secondary admin allowlist`);
+      setNewEmail('');
+    } catch (error: any) {
+      toast.error(`Failed to add email: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleRemoveEmail = async (email: string) => {
+    try {
+      await removeEmailMutation.mutateAsync(email);
+      toast.success(`${email} removed from secondary admin allowlist`);
+      setRemoveConfirmEmail(null);
+    } catch (error: any) {
+      toast.error(`Failed to remove email: ${error.message || 'Unknown error'}`);
+      setRemoveConfirmEmail(null);
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Secondary Admin Settings</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage secondary admin email allowlist. Users with these emails will be granted admin privileges but cannot access User Management.
-        </p>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Shield className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Secondary Admin Allowlist</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage email addresses that can register as secondary admins
+            </p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      {/* Add Email Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Add Secondary Admin Email
-          </CardTitle>
-          <CardDescription>
-            Enter an email address to grant secondary admin privileges. When a user registers with this email, they will automatically become a secondary admin.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
+      {/* Add Email Form */}
+      <div className="border border-border rounded-lg p-4 bg-card space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">Add Secondary Admin Email</h2>
+        <div className="flex gap-2">
+          <div className="flex-1">
             <Input
               type="email"
-              placeholder="email@example.com"
+              placeholder="admin@example.com"
               value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddEmail();
-                }
+              onChange={(e) => {
+                setNewEmail(e.target.value);
+                setEmailError('');
               }}
-              disabled={addEmailMutation.isPending}
-              className="flex-1"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddEmail()}
+              className={emailError ? 'border-destructive' : ''}
             />
-            <Button
-              onClick={handleAddEmail}
-              disabled={addEmailMutation.isPending || !newEmail.trim()}
-            >
-              {addEmailMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Email
-                </>
-              )}
-            </Button>
+            {emailError && (
+              <p className="text-xs text-destructive mt-1">{emailError}</p>
+            )}
           </div>
-        </CardContent>
-      </Card>
+          <Button
+            onClick={handleAddEmail}
+            disabled={addEmailMutation.isPending || !newEmail.trim()}
+          >
+            {addEmailMutation.isPending ? (
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Plus className="w-4 h-4 mr-2" />
+            )}
+            Add Email
+          </Button>
+        </div>
+      </div>
 
-      {/* Email List Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Secondary Admin Emails ({emails.length})
-          </CardTitle>
-          <CardDescription>
-            Current list of email addresses with secondary admin privileges
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {emails.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Mail className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No secondary admin emails configured</p>
-              <p className="text-sm mt-1">Add an email above to get started</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {emails.map((email) => (
-                <div
-                  key={email}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{email}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEmailToRemove(email)}
-                    disabled={removeEmailMutation.isPending}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+      {/* Email List */}
+      <div className="border border-border rounded-lg overflow-hidden">
+        <div className="bg-muted/50 px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">
+            Allowlisted Emails ({emails.length})
+          </h2>
+        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-5 h-5 animate-spin text-muted-foreground mr-2" />
+            <span className="text-muted-foreground text-sm">Loading...</span>
+          </div>
+        ) : emails.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Mail className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No emails in the allowlist</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {emails.map((email) => (
+              <li key={email} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-foreground">{email}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => setRemoveConfirmEmail(email)}
+                  disabled={removeEmailMutation.isPending}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {/* Remove Confirmation Dialog */}
-      <AlertDialog open={!!emailToRemove} onOpenChange={(open) => !open && setEmailToRemove(null)}>
+      <AlertDialog open={!!removeConfirmEmail} onOpenChange={() => setRemoveConfirmEmail(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Secondary Admin Email?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Remove from Allowlist
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove <strong>{emailToRemove}</strong> from the secondary admin allowlist?
-              <br /><br />
-              <strong>Note:</strong> This will prevent future users with this email from automatically becoming secondary admins. 
-              Existing users who already have admin privileges will keep their current access until manually changed.
+              Are you sure you want to remove <strong>{removeConfirmEmail}</strong> from the secondary admin allowlist?
+              This user will no longer be able to register as a secondary admin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={removeEmailMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleRemoveEmail}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => removeConfirmEmail && handleRemoveEmail(removeConfirmEmail)}
               disabled={removeEmailMutation.isPending}
-              className="bg-destructive hover:bg-destructive/90"
             >
-              {removeEmailMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Removing...
-                </>
-              ) : (
-                'Remove Email'
-              )}
+              {removeEmailMutation.isPending ? 'Removing...' : 'Remove'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

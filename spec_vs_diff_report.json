@@ -1,68 +1,68 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-24T12:35:47.297Z",
-  "summary": "The diff implements several requirements but has notable gaps, particularly around REQ-1 (backend permission enforcement) and REQ-2 (backend role validation and migration). REQ-3 and REQ-5 appear well-implemented on the frontend. REQ-4 backend changes are unclear from the truncated diff.",
+  "generatedAt": "2026-02-25T04:36:49.518Z",
+  "summary": "The diff addresses both REQ-1 and REQ-2. The frontend RequestManagementModule.tsx has been rewritten with loading states, error state with retry, empty state, filtering, approve/reject with immediate list refresh. The useQueries.ts hook fixes useUserRequests to call getApprovalRequests (with fallback) and invalidates the correct query key on mutations. The backend/main.mo is modified but the content is truncated so full backend fix verification is limited. Overall coverage is good but some AC items need scrutiny.",
   "missing_requirements": [
     {
       "id": "REQ-1",
-      "requirement": "Backend must store and enforce secondary admin permissions (Login Access, View User Requests, Approve/Reject Requests) as part of the role's access control configuration.",
-      "reason": "The backend/main.mo diff is truncated and shows no explicit secondary admin role definition with permission fields set to enabled. The migration.mo does not add any permission-related fields to role or user structures. No evidence of authorization checks enforcing these three permissions for secondary admin users.",
-      "evidence": [
-        "backend/main.mo",
-        "backend/migration.mo"
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "requirement": "Fix user role mapping bug: validate secondary admin role is Admin or Sub Admin, status is Active, and access modules include User Management and Request Management before saving. Existing incorrectly-saved records must be corrected on upgrade.",
-      "reason": "The migration.mo run() function simply returns the old state unchanged (public func run(old : NewActor) : NewActor { old }), providing no correction of existing misconfigured secondary admin records. The backend/main.mo truncated diff shows no new validation logic for enforcing correct role assignment when creating or updating secondary admin users.",
-      "evidence": [
-        "backend/migration.mo",
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "requirement": "Backend must correctly filter and return pending user requests via the admin API; the endpoint must not return empty results when pending requests exist.",
-      "reason": "The backend/main.mo content is heavily truncated. There is no visible evidence of a fixed or new backend method that explicitly filters by status=Pending and ensures non-empty results. The frontend useUserRequests hook exists but the backend-side fix is unconfirmed.",
-      "evidence": [
-        "backend/main.mo",
-        "frontend/src/hooks/useQueries.ts"
-      ]
-    }
-  ],
-  "hallucinated_features": [
-    {
-      "description": "The migration.mo module defines a full NewActor type with all stable state fields but its run() function is a no-op that returns old state unchanged, yet it is included as if it satisfies the migration requirement for correcting secondary admin records.",
-      "reason": "REQ-2 requires existing incorrectly-saved secondary admin records to be corrected on upgrade. The migration.mo performs no correction, making its inclusion misleading with respect to that acceptance criterion.",
-      "evidence": [
-        "backend/migration.mo"
-      ]
-    },
-    {
-      "description": "RequestManagementModule includes full approve and reject action buttons with confirmation dialogs and toast notifications.",
-      "reason": "REQ-5 only requests filtering, display, refresh-on-mount, and empty state messaging. The full approve/reject workflow with AlertDialog confirmation and mutation calls was not listed as a requirement in REQ-5.",
+      "requirement": "Pending requests are displayed with correct user details (name, email, role, department)",
+      "reason": "The RequestManagementModule.tsx diff is truncated before the table rows are shown, so it cannot be confirmed that name, email, role, and department are all rendered for each request.",
       "evidence": [
         "frontend/src/components/modules/RequestManagementModule.tsx"
       ]
     }
   ],
-  "confidence": 0.62,
+  "hallucinated_features": [
+    {
+      "description": "ProfileSetup component updated to add Admin role option with Crown icon and to skip the approval request step when Admin role is selected",
+      "reason": "The build request non-goals explicitly state not to change the approval workflow or role permission model. Adding Admin as a selectable role that bypasses approval is an unrequested workflow change.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "LoginPage enhanced with improved error handling, user-friendly error messages, loading states, and retry mechanism",
+      "reason": "The build request is scoped entirely to fixing approval requests not loading in the Request Management module. LoginPage changes were not requested.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "Header component updated to accept bootstrapData prop and use useIsSuperAdmin hook",
+      "reason": "No requirement in the build request calls for changes to the Header component.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "Sidebar updated to use useIsAdminRole so users with appRole='admin' see all admin menu items",
+      "reason": "No requirement in the build request calls for changes to the Sidebar component or role-based menu filtering.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "CustomersModule updated to derive isAdmin from userProfile.appRole instead of the useIsAdmin hook",
+      "reason": "No requirement in the build request calls for changes to the Customers module.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "DashboardHome updated to use useDashboardMetrics alias and accept userProfile prop",
+      "reason": "No requirement in the build request calls for changes to the DashboardHome module.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    }
+  ],
+  "confidence": 0.72,
   "changed_files": [
     "backend/main.mo",
-    "backend/migration.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/App.tsx",
-    "frontend/src/components/ApprovalPending.tsx",
-    "frontend/src/components/Header.tsx",
-    "frontend/src/components/Sidebar.tsx",
-    "frontend/src/components/modules/CustomersModule.tsx",
-    "frontend/src/components/modules/ReportsModule.tsx",
     "frontend/src/components/modules/RequestManagementModule.tsx",
-    "frontend/src/components/modules/UserManagementModule.tsx",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/Dashboard.tsx",
     "project_state.json"
   ]
 }

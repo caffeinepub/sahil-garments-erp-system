@@ -242,6 +242,7 @@ export interface _SERVICE {
     ExternalBlob
   >,
   'exportProductBarcode' : ActorMethod<[BarcodeExportRequest], ExternalBlob>,
+  'getApprovalRequests' : ActorMethod<[], Array<UserApprovalInfo>>,
   'getBootstrapState' : ActorMethod<[], AppBootstrapState>,
   'getBootstrapStatus' : ActorMethod<[], BootstrapStatus>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,

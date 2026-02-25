@@ -19,7 +19,6 @@ export default function App() {
   const queryClient = useQueryClient();
   const [retryCount, setRetryCount] = useState(0);
 
-  // Fetch bootstrap state after authentication
   const {
     data: bootstrapState,
     isLoading: bootstrapLoading,
@@ -28,48 +27,30 @@ export default function App() {
     refetch: refetchBootstrap,
   } = useGetBootstrapState();
 
-  // Debug logging
-  useEffect(() => {
-    if (bootstrapFetched) {
-      console.log('[App] Bootstrap state fetched:', {
-        hasProfile: !!bootstrapState?.userProfile,
-        isApproved: bootstrapState?.isApproved,
-        isAdmin: bootstrapState?.isAdmin,
-      });
-    }
-  }, [bootstrapFetched, bootstrapState]);
-
-  // Log errors
   useEffect(() => {
     if (bootstrapError) {
       console.error('[App] Bootstrap error:', bootstrapError);
     }
   }, [bootstrapError]);
 
-  // Handle retry
   const handleRetry = async () => {
-    console.log('[App] Retrying initialization...');
     setRetryCount(prev => prev + 1);
     await queryClient.invalidateQueries();
     await refetchBootstrap();
   };
 
-  // Show loading during initialization
   if (isInitializing) {
     return <LoadingWorkspace />;
   }
 
-  // Show login page if not authenticated
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
-  // Show loading while fetching bootstrap state
   if (bootstrapLoading || !bootstrapFetched) {
     return <AuthenticatedAppShell isLoading={true} />;
   }
 
-  // Handle bootstrap errors (including rejection)
   if (bootstrapError) {
     if (isRejectedError(bootstrapError) && bootstrapState?.userProfile) {
       return <ApprovalPending userProfile={bootstrapState.userProfile} />;
@@ -83,9 +64,7 @@ export default function App() {
     );
   }
 
-  // Null safety check for bootstrap state
   if (!bootstrapState) {
-    console.error('[App] Bootstrap state is null after successful fetch');
     return (
       <InitializationError
         error={new Error('Bootstrap state is empty. Please try again.')}
@@ -95,20 +74,14 @@ export default function App() {
     );
   }
 
-  // Profile setup required
   if (!bootstrapState.userProfile) {
-    console.log('[App] No user profile found, showing ProfileSetup');
     return <ProfileSetup />;
   }
 
-  // Approval pending (not admin, not approved)
   if (!bootstrapState.isAdmin && !bootstrapState.isApproved) {
-    console.log('[App] User not approved, showing ApprovalPending');
     return <ApprovalPending userProfile={bootstrapState.userProfile} />;
   }
 
-  // Authenticated and approved - show dashboard
-  console.log('[App] User authenticated and approved, showing Dashboard');
   return (
     <PollingProvider>
       <Suspense fallback={<LoadingWorkspace />}>

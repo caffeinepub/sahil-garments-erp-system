@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useListCustomers, useCreateCustomer, useDeleteCustomer, useIsAdmin } from '../../hooks/useQueries';
+import { useListCustomers, useCreateCustomer, useDeleteCustomer } from '../../hooks/useQueries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, Trash2, AlertTriangle } from 'lucide-react';
-import { UserProfile } from '../../backend';
+import { UserProfile, AppRole } from '../../backend';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -20,7 +20,6 @@ export default function CustomersModule({ userProfile }: CustomersModuleProps) {
   const { data: customers = [], isLoading } = useListCustomers();
   const createCustomer = useCreateCustomer();
   const deleteCustomer = useDeleteCustomer();
-  const { data: isAdmin = false } = useIsAdmin();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,7 +32,8 @@ export default function CustomersModule({ userProfile }: CustomersModuleProps) {
     address: '',
   });
 
-  const canCreate = userProfile.appRole === 'admin' || userProfile.appRole === 'sales';
+  const isAdmin = userProfile.appRole === AppRole.admin;
+  const canCreate = isAdmin || userProfile.appRole === AppRole.sales;
   const canDelete = isAdmin;
 
   const filteredCustomers = customers.filter((customer) =>
@@ -239,7 +239,7 @@ export default function CustomersModule({ userProfile }: CustomersModuleProps) {
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <MapPin className="h-3 w-3" />
-                          {customer.address}
+                          <span className="truncate max-w-[150px]">{customer.address}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -248,14 +248,12 @@ export default function CustomersModule({ userProfile }: CustomersModuleProps) {
                       {canDelete && (
                         <TableCell className="text-right">
                           <Button
-                            variant="destructive"
+                            variant="ghost"
                             size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleDeleteClick(customer.id, customer.name)}
-                            disabled={deleteCustomer.isPending}
-                            className="gap-2"
                           >
                             <Trash2 className="h-4 w-4" />
-                            Delete
                           </Button>
                         </TableCell>
                       )}
@@ -268,39 +266,25 @@ export default function CustomersModule({ userProfile }: CustomersModuleProps) {
         </CardContent>
       </Card>
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <img src="/assets/generated/customer-delete-warning-icon-transparent.dim_32x32.png" alt="" className="h-6 w-6" />
-              Delete Customer - Confirmation Required
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Customer
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-semibold text-red-900 dark:text-red-100">Warning: This action cannot be undone!</p>
-                  <p className="text-red-800 dark:text-red-200 mt-1">
-                    Are you sure you want to permanently delete customer <strong>"{customerToDelete?.name}"</strong>?
-                  </p>
-                </div>
-              </div>
-              <p className="text-sm">
-                This will remove all customer data including transaction history. All related orders and invoices will be affected.
-              </p>
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                <p className="text-xs text-amber-900 dark:text-amber-100 font-medium">
-                  Admin Verification: Only administrators can perform this operation.
-                </p>
-              </div>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{customerToDelete?.name}</strong>?
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteCustomer.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={deleteCustomer.isPending}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-destructive hover:bg-destructive/90"
             >
               {deleteCustomer.isPending ? (
                 <>
@@ -308,10 +292,7 @@ export default function CustomersModule({ userProfile }: CustomersModuleProps) {
                   Deleting...
                 </>
               ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Customer
-                </>
+                'Delete Customer'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

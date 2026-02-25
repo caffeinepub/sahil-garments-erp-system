@@ -214,6 +214,7 @@ export interface backendInterface {
     deleteNotification(notificationId: bigint): Promise<boolean>;
     exportInvoiceHistory(arg0: InvoiceExportFormat, arg1: InvoiceFilter | null, arg2: string | null, arg3: string | null): Promise<ExternalBlob>;
     exportProductBarcode(arg0: BarcodeExportRequest): Promise<ExternalBlob>;
+    getApprovalRequests(): Promise<Array<UserApprovalInfo>>;
     getBootstrapState(): Promise<AppBootstrapState>;
     getBootstrapStatus(): Promise<BootstrapStatus>;
     getCallerUserProfile(): Promise<UserProfile | null>;

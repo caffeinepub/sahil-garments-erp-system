@@ -1,13 +1,44 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
-import { AppRole, ApprovalStatus, UserProfile, UserApprovalInfo } from '../backend';
-import { usePolling } from '../context/PollingContext';
+import {
+  AppRole,
+  AppBootstrapState,
+  UserProfile,
+  Product,
+  Customer,
+  OrderRecord,
+  InventoryRecord,
+  Invoice,
+  Notification,
+  Stats,
+  ProfitLossReport,
+  UserApprovalInfo,
+  ApprovalStatus,
+} from '../backend';
+import { Principal } from '@dfinity/principal';
 
-// ─── User Profile ────────────────────────────────────────────────────────────
+// ─── Bootstrap ───────────────────────────────────────────────────────────────
+
+export function useGetBootstrapState() {
+  const { actor, isFetching: actorFetching } = useActor();
+  const query = useQuery<AppBootstrapState | null>({
+    queryKey: ['bootstrapState'],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getBootstrapState();
+    },
+    enabled: !!actor && !actorFetching,
+    retry: false,
+  });
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+    isFetched: !!actor && query.isFetched,
+  };
+}
 
 export function useGetCallerUserProfile() {
   const { actor, isFetching: actorFetching } = useActor();
-
   const query = useQuery<UserProfile | null>({
     queryKey: ['currentUserProfile'],
     queryFn: async () => {
@@ -17,27 +48,6 @@ export function useGetCallerUserProfile() {
     enabled: !!actor && !actorFetching,
     retry: false,
   });
-
-  return {
-    ...query,
-    isLoading: actorFetching || query.isLoading,
-    isFetched: !!actor && query.isFetched,
-  };
-}
-
-export function useGetBootstrapState() {
-  const { actor, isFetching: actorFetching } = useActor();
-
-  const query = useQuery({
-    queryKey: ['bootstrapState'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getBootstrapState();
-    },
-    enabled: !!actor && !actorFetching,
-    retry: false,
-  });
-
   return {
     ...query,
     isLoading: actorFetching || query.isLoading,
@@ -48,7 +58,6 @@ export function useGetBootstrapState() {
 export function useSaveCallerUserProfile() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
       if (!actor) throw new Error('Actor not available');
@@ -57,23 +66,12 @@ export function useSaveCallerUserProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
       queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+      queryClient.invalidateQueries({ queryKey: ['allUserProfiles'] });
     },
   });
 }
 
-// ─── Admin / Role Checks ─────────────────────────────────────────────────────
-
-export function useIsSuperAdmin() {
-  const { actor, isFetching } = useActor();
-  return useQuery<boolean>({
-    queryKey: ['isSuperAdmin'],
-    queryFn: async () => {
-      if (!actor) return false;
-      return actor.isSuperAdmin();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
+// ─── Admin / Role Checks (React Query hooks) ─────────────────────────────────
 
 export function useIsAdmin() {
   const { actor, isFetching } = useActor();
@@ -87,8 +85,33 @@ export function useIsAdmin() {
   });
 }
 
+export function useIsSuperAdmin() {
+  const { actor, isFetching } = useActor();
+  return useQuery<boolean>({
+    queryKey: ['isSuperAdmin'],
+    queryFn: async () => {
+      if (!actor) return false;
+      return actor.isSuperAdmin();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
 // Alias for backward compatibility
 export const useIsCallerAdmin = useIsAdmin;
+
+/**
+ * Helper function (NOT a hook) that returns true if the user is an admin
+ * either via the isAdmin flag from bootstrap state OR via appRole === 'admin'.
+ */
+export function useIsAdminRole(bootstrapData?: AppBootstrapState | null): boolean {
+  if (!bootstrapData) return false;
+  if (bootstrapData.isAdmin) return true;
+  if (bootstrapData.userProfile?.appRole === AppRole.admin) return true;
+  return false;
+}
+
+// ─── Approval ────────────────────────────────────────────────────────────────
 
 export function useIsCallerApproved() {
   const { actor, isFetching } = useActor();
@@ -102,7 +125,20 @@ export function useIsCallerApproved() {
   });
 }
 
-// ─── Approvals ───────────────────────────────────────────────────────────────
+export function useRequestApproval() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.requestApproval();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
+      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+    },
+  });
+}
 
 export function useListApprovals() {
   const { actor, isFetching } = useActor();
@@ -116,31 +152,19 @@ export function useListApprovals() {
   });
 }
 
-export function useGetPendingUsers() {
-  const { actor, isFetching } = useActor();
-  return useQuery<UserApprovalInfo[]>({
-    queryKey: ['pendingUsers'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getPendingUsers();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useRequestApproval() {
+export function useSetApproval() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ user, status }: { user: Principal; status: ApprovalStatus }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.requestApproval();
+      return actor.setApproval(user, status);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
-      queryClient.invalidateQueries({ queryKey: ['isCallerApproved'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
+      queryClient.invalidateQueries({ queryKey: ['listApprovals'] });
+      queryClient.invalidateQueries({ queryKey: ['allUserProfiles'] });
+      queryClient.invalidateQueries({ queryKey: ['approvalRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['userRequests'] });
     },
   });
 }
@@ -148,17 +172,16 @@ export function useRequestApproval() {
 export function useApproveUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async (user: string) => {
+    mutationFn: async (user: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      const { Principal } = await import('@dfinity/principal');
-      return actor.approveUser(Principal.fromText(user));
+      return actor.approveUser(user);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
       queryClient.invalidateQueries({ queryKey: ['listApprovals'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfiles'] });
+      queryClient.invalidateQueries({ queryKey: ['allUserProfiles'] });
+      queryClient.invalidateQueries({ queryKey: ['approvalRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['userRequests'] });
     },
   });
 }
@@ -166,90 +189,119 @@ export function useApproveUser() {
 export function useRejectUser() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async (user: string) => {
+    mutationFn: async (user: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      const { Principal } = await import('@dfinity/principal');
-      return actor.rejectUser(Principal.fromText(user));
+      return actor.rejectUser(user);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
       queryClient.invalidateQueries({ queryKey: ['listApprovals'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfiles'] });
+      queryClient.invalidateQueries({ queryKey: ['allUserProfiles'] });
+      queryClient.invalidateQueries({ queryKey: ['approvalRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['userRequests'] });
     },
   });
 }
 
-export function useSetApproval() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
+// ─── Approval Requests (dedicated hook using getApprovalRequests) ─────────────
 
-  return useMutation({
-    mutationFn: async ({ user, status }: { user: string; status: ApprovalStatus }) => {
-      if (!actor) throw new Error('Actor not available');
-      const { Principal } = await import('@dfinity/principal');
-      return actor.setApproval(Principal.fromText(user), status);
+export function useGetApprovalRequests() {
+  const { actor, isFetching } = useActor();
+  return useQuery<UserApprovalInfo[]>({
+    queryKey: ['approvalRequests'],
+    queryFn: async () => {
+      if (!actor) return [];
+      try {
+        return await actor.getApprovalRequests();
+      } catch (err: any) {
+        // If getApprovalRequests fails (e.g. not primary admin), fall back to listApprovals
+        return actor.listApprovals();
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
-      queryClient.invalidateQueries({ queryKey: ['listApprovals'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfiles'] });
-    },
+    enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 
-// ─── User Profiles (admin) ───────────────────────────────────────────────────
+// ─── User Management ─────────────────────────────────────────────────────────
 
-export function useGetUserProfile(principalText: string | null) {
+export function useAllUserProfiles() {
+  const { actor, isFetching } = useActor();
+  return useQuery<UserApprovalInfo[]>({
+    queryKey: ['allUserProfiles'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listApprovals();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useUserRequests() {
+  const { actor, isFetching } = useActor();
+  return useQuery<UserApprovalInfo[]>({
+    queryKey: ['approvalRequests'],
+    queryFn: async () => {
+      if (!actor) return [];
+      try {
+        return await actor.getApprovalRequests();
+      } catch (err: any) {
+        // Fallback to listApprovals if getApprovalRequests is not available
+        return actor.listApprovals();
+      }
+    },
+    enabled: !!actor && !isFetching,
+    retry: 1,
+  });
+}
+
+export function useGetUserProfile(user: Principal | null) {
   const { actor, isFetching } = useActor();
   return useQuery<UserProfile | null>({
-    queryKey: ['userProfile', principalText],
+    queryKey: ['userProfile', user?.toString()],
     queryFn: async () => {
-      if (!actor || !principalText) return null;
-      const { Principal } = await import('@dfinity/principal');
-      return actor.getUserProfile(Principal.fromText(principalText));
+      if (!actor || !user) return null;
+      return actor.getUserProfile(user);
     },
-    enabled: !!actor && !isFetching && !!principalText,
+    enabled: !!actor && !isFetching && !!user,
+    retry: false,
   });
 }
 
 export function useAssignAppRole() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async ({ user, role }: { user: string; role: AppRole }) => {
+    mutationFn: async ({ user, role }: { user: Principal; role: AppRole }) => {
       if (!actor) throw new Error('Actor not available');
-      const { Principal } = await import('@dfinity/principal');
-      return actor.assignAppRole(Principal.fromText(user), role);
+      return actor.assignAppRole(user, role);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allUserProfiles'] });
       queryClient.invalidateQueries({ queryKey: ['listApprovals'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfiles'] });
+      queryClient.invalidateQueries({ queryKey: ['approvalRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['userRequests'] });
     },
   });
 }
 
-export function useRemoveUser() {
+export function usePermanentlyRemoveUserAccount() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async (user: string) => {
+    mutationFn: async (user: Principal) => {
       if (!actor) throw new Error('Actor not available');
-      const { Principal } = await import('@dfinity/principal');
-      return actor.permanentlyRemoveUserAccount(Principal.fromText(user));
+      return actor.permanentlyRemoveUserAccount(user);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingUsers'] });
+      queryClient.invalidateQueries({ queryKey: ['allUserProfiles'] });
       queryClient.invalidateQueries({ queryKey: ['listApprovals'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfiles'] });
+      queryClient.invalidateQueries({ queryKey: ['approvalRequests'] });
     },
   });
 }
 
-// ─── Secondary Admin Emails ──────────────────────────────────────────────────
+// ─── Secondary Admin Allowlist ────────────────────────────────────────────────
 
 export function useListSecondaryAdminEmails() {
   const { actor, isFetching } = useActor();
@@ -266,7 +318,6 @@ export function useListSecondaryAdminEmails() {
 export function useAddSecondaryAdminEmail() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (email: string) => {
       if (!actor) throw new Error('Actor not available');
@@ -281,7 +332,6 @@ export function useAddSecondaryAdminEmail() {
 export function useRemoveSecondaryAdminEmail() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (email: string) => {
       if (!actor) throw new Error('Actor not available');
@@ -293,20 +343,17 @@ export function useRemoveSecondaryAdminEmail() {
   });
 }
 
-// ─── Products ────────────────────────────────────────────────────────────────
+// ─── Products / Inventory ─────────────────────────────────────────────────────
 
 export function useListProducts() {
   const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery({
+  return useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listProducts();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 10000 : false,
   });
 }
 
@@ -316,32 +363,15 @@ export const useGetProducts = useListProducts;
 export function useAddProduct() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (params: {
-      name: string;
-      description: string;
-      price: bigint;
-      stockLevel: bigint;
-      warehouse: string;
-      rack: string;
-      shelf: string;
-      size: string;
-      color: string;
-      barcode: string;
+      name: string; description: string; price: bigint; stockLevel: bigint;
+      warehouse: string; rack: string; shelf: string; size: string; color: string; barcode: string;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.addProduct(
-        params.name,
-        params.description,
-        params.price,
-        params.stockLevel,
-        params.warehouse,
-        params.rack,
-        params.shelf,
-        params.size,
-        params.color,
-        params.barcode,
+        params.name, params.description, params.price, params.stockLevel,
+        params.warehouse, params.rack, params.shelf, params.size, params.color, params.barcode
       );
     },
     onSuccess: () => {
@@ -353,34 +383,15 @@ export function useAddProduct() {
 export function useUpdateProduct() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (params: {
-      productId: bigint;
-      name: string;
-      description: string;
-      price: bigint;
-      stockLevel: bigint;
-      warehouse: string;
-      rack: string;
-      shelf: string;
-      size: string;
-      color: string;
-      barcode: string;
+      productId: bigint; name: string; description: string; price: bigint; stockLevel: bigint;
+      warehouse: string; rack: string; shelf: string; size: string; color: string; barcode: string;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.updateProduct(
-        params.productId,
-        params.name,
-        params.description,
-        params.price,
-        params.stockLevel,
-        params.warehouse,
-        params.rack,
-        params.shelf,
-        params.size,
-        params.color,
-        params.barcode,
+        params.productId, params.name, params.description, params.price, params.stockLevel,
+        params.warehouse, params.rack, params.shelf, params.size, params.color, params.barcode
       );
     },
     onSuccess: () => {
@@ -392,7 +403,6 @@ export function useUpdateProduct() {
 export function useDeleteAllInventory() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error('Actor not available');
@@ -405,27 +415,23 @@ export function useDeleteAllInventory() {
   });
 }
 
-// ─── Customers ───────────────────────────────────────────────────────────────
+// ─── Customers ────────────────────────────────────────────────────────────────
 
 export function useListCustomers() {
   const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery({
+  return useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listCustomers();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 15000 : false,
   });
 }
 
 export function useCreateCustomer() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (params: { name: string; email: string; phone: string; address: string }) => {
       if (!actor) throw new Error('Actor not available');
@@ -440,7 +446,6 @@ export function useCreateCustomer() {
 export function useDeleteCustomer() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (customerId: bigint) => {
       if (!actor) throw new Error('Actor not available');
@@ -448,53 +453,37 @@ export function useDeleteCustomer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
 
-// ─── Orders ──────────────────────────────────────────────────────────────────
+// ─── Orders ───────────────────────────────────────────────────────────────────
 
 export function useListOrders() {
   const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery({
+  return useQuery<OrderRecord[]>({
     queryKey: ['orders'],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listOrders();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 10000 : false,
   });
 }
 
 export function useCreateOrder() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (params: {
-      customerId: bigint;
-      productId: bigint;
-      quantity: bigint;
-      status: string;
-      totalPrice: bigint;
+      customerId: bigint; productId: bigint; quantity: bigint; status: string; totalPrice: bigint;
     }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.createOrder(
-        params.customerId,
-        params.productId,
-        params.quantity,
-        params.status,
-        params.totalPrice,
-      );
+      return actor.createOrder(params.customerId, params.productId, params.quantity, params.status, params.totalPrice);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
@@ -502,7 +491,6 @@ export function useCreateOrder() {
 export function useDeleteAllOrders() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error('Actor not available');
@@ -510,32 +498,56 @@ export function useDeleteAllOrders() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
 
-// ─── Invoices ────────────────────────────────────────────────────────────────
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+export function useListInventory() {
+  const { actor, isFetching } = useActor();
+  return useQuery<InventoryRecord[]>({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listInventory();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAddInventoryEntry() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { productId: bigint; quantity: bigint; batch: string; supplierId: bigint }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.addInventoryEntry(params.productId, params.quantity, params.batch, params.supplierId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+}
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
 
 export function useListInvoices() {
   const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery({
+  return useQuery<Invoice[]>({
     queryKey: ['invoices'],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listInvoices();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 15000 : false,
   });
 }
 
 export function useGetInvoice(invoiceId: bigint | null) {
   const { actor, isFetching } = useActor();
-
-  return useQuery({
+  return useQuery<Invoice | null>({
     queryKey: ['invoice', invoiceId?.toString()],
     queryFn: async () => {
       if (!actor || invoiceId === null) return null;
@@ -548,26 +560,15 @@ export function useGetInvoice(invoiceId: bigint | null) {
 export function useCreateInvoice() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (params: {
-      customerId: bigint;
-      productId: bigint;
-      quantity: bigint;
-      price: bigint;
-      tax: bigint;
-      total: bigint;
-      status: import('../backend').T;
+      customerId: bigint; productId: bigint; quantity: bigint;
+      price: bigint; tax: bigint; total: bigint; status: any;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.createInvoice(
-        params.customerId,
-        params.productId,
-        params.quantity,
-        params.price,
-        params.tax,
-        params.total,
-        params.status,
+        params.customerId, params.productId, params.quantity,
+        params.price, params.tax, params.total, params.status
       );
     },
     onSuccess: () => {
@@ -579,7 +580,6 @@ export function useCreateInvoice() {
 export function useStockAdjustInvoice() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (invoiceId: bigint) => {
       if (!actor) throw new Error('Actor not available');
@@ -595,7 +595,6 @@ export function useStockAdjustInvoice() {
 export function useClearAllInvoices() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error('Actor not available');
@@ -607,133 +606,49 @@ export function useClearAllInvoices() {
   });
 }
 
+export function useUpdateInvoiceDocumentUrls() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { invoiceId: bigint; imageUrl: string | null; pdfUrl: string | null }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.updateInvoiceDocumentUrls(params.invoiceId, params.imageUrl, params.pdfUrl);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+}
+
 export function useGetInvoiceHistory() {
   const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery({
+  return useQuery<Invoice[]>({
     queryKey: ['invoiceHistory'],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getInvoiceHistory(null, null, null);
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 20000 : false,
   });
 }
 
-export function useUpdateInvoiceDocumentUrls() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      invoiceId: bigint;
-      imageUrl: string | null;
-      pdfUrl: string | null;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.updateInvoiceDocumentUrls(params.invoiceId, params.imageUrl, params.pdfUrl);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoiceHistory'] });
-    },
-  });
-}
-
-// ─── Inventory ───────────────────────────────────────────────────────────────
-
-export function useListInventory() {
-  const { actor, isFetching } = useActor();
-
-  return useQuery({
-    queryKey: ['inventory'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listInventory();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useAddInventoryEntry() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      productId: bigint;
-      quantity: bigint;
-      batch: string;
-      supplierId: bigint;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.addInventoryEntry(params.productId, params.quantity, params.batch, params.supplierId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
-  });
-}
-
-// ─── Stats / Dashboard ───────────────────────────────────────────────────────
-
-export function useGetStats() {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery({
-    queryKey: ['stats'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getStats();
-    },
-    enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 10000 : false,
-  });
-}
-
-// Alias for backward compatibility
-export const useDashboardMetrics = useGetStats;
-
-// ─── Data Entries (stub - not in backend, returns empty) ─────────────────────
-
-export function useListDataEntries() {
-  const { actor, isFetching } = useActor();
-
-  return useQuery({
-    queryKey: ['dataEntries'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listDataEntries();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-// ─── Notifications ───────────────────────────────────────────────────────────
+// ─── Notifications ────────────────────────────────────────────────────────────
 
 export function useListNotifications() {
   const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery({
+  return useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
       if (!actor) return [];
       return actor.listNotifications();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 8000 : false,
   });
 }
 
 export function useMarkNotificationAsRead() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (notificationId: bigint) => {
       if (!actor) throw new Error('Actor not available');
@@ -748,7 +663,6 @@ export function useMarkNotificationAsRead() {
 export function useDeleteNotification() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (notificationId: bigint) => {
       if (!actor) throw new Error('Actor not available');
@@ -760,95 +674,31 @@ export function useDeleteNotification() {
   });
 }
 
-// ─── Profit & Loss ───────────────────────────────────────────────────────────
+// ─── Stats / Reports ──────────────────────────────────────────────────────────
+
+export function useGetStats() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Stats | null>({
+    queryKey: ['stats'],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getStats();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+// Alias for dashboard metrics
+export const useDashboardMetrics = useGetStats;
 
 export function useGetProfitLossReport(startDate: bigint, endDate: bigint) {
   const { actor, isFetching } = useActor();
-
-  return useQuery({
-    queryKey: ['profitLoss', startDate.toString(), endDate.toString()],
+  return useQuery<ProfitLossReport | null>({
+    queryKey: ['profitLossReport', startDate.toString(), endDate.toString()],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) return null;
       return actor.getProfitLossReport(startDate, endDate);
     },
     enabled: !!actor && !isFetching,
-  });
-}
-
-// ─── User Requests (for Request Management module) ───────────────────────────
-
-export function useUserRequests() {
-  const { actor, isFetching } = useActor();
-  const { shouldPoll } = usePolling();
-
-  return useQuery<UserApprovalInfo[]>({
-    queryKey: ['userRequests'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listApprovals();
-    },
-    enabled: !!actor && !isFetching,
-    refetchInterval: shouldPoll ? 15000 : false,
-  });
-}
-
-// ─── User Profiles bulk fetch (for User Management) ─────────────────────────
-
-export function useAllUserProfiles(principals: string[]) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<Record<string, UserProfile | null>>({
-    queryKey: ['userProfiles', principals.join(',')],
-    queryFn: async () => {
-      if (!actor || principals.length === 0) return {};
-      const { Principal } = await import('@dfinity/principal');
-      const results = await Promise.all(
-        principals.map(async (p) => {
-          try {
-            const profile = await actor.getUserProfile(Principal.fromText(p));
-            return [p, profile] as [string, UserProfile | null];
-          } catch {
-            return [p, null] as [string, UserProfile | null];
-          }
-        }),
-      );
-      return Object.fromEntries(results);
-    },
-    enabled: !!actor && !isFetching && principals.length > 0,
-  });
-}
-
-// ─── Inventory Report Barcodes ───────────────────────────────────────────────
-
-export function useGetInventoryReportBarcodes() {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<string[]>({
-    queryKey: ['inventoryReportBarcodes'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getInventoryReportBarcodes();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-// ─── Product Location ────────────────────────────────────────────────────────
-
-export function useSetProductLocation() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      productId: bigint;
-      location: import('../backend').InventoryLocation;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.setProductLocation(params.productId, params.location);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
   });
 }

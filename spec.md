@@ -1,14 +1,14 @@
 # Specification
 
 ## Summary
-**Goal:** Fix secondary admin role permissions, user role mapping bugs, and request management data flow in the Sahil Garments ERP.
+**Goal:** Fix the Request Management module so that approval requests load and display correctly for admin users.
 
 **Planned changes:**
-- Backend: Ensure the secondary admin role explicitly stores and enforces Login Access, View User Requests, and Approve/Reject Requests as enabled permissions
-- Backend: Fix the bug where secondary admin accounts are incorrectly saved with the normal user role; validate that role is set to 'Admin' or 'Sub Admin', status is 'Active', and access modules include 'User Management' and 'Request Management' before saving
-- Backend: Correct any existing secondary admin records that were saved with wrong role mappings via migration if needed
-- Backend: Fix the pending user requests API to properly filter by status = Pending and return all relevant request data for Admin/Sub Admin users
-- Frontend: In the User Management panel, display Role, Status, and assigned access modules columns for each user; show a warning badge on secondary admin accounts where the role is misconfigured
-- Frontend: In the Request Management module, connect it to the backend API, add a filter control (All, Pending, other statuses), refresh data on mount, and show an empty state message when no requests match the filter
+- Investigate and fix the backend `getApprovalRequests` (or equivalent) function to ensure it correctly returns all stored approval requests without silent empty results or runtime traps
+- Fix data fetching in the frontend Request Management module so pending, approved, and rejected requests render correctly
+- Add proper loading spinner while requests are being fetched
+- Add error state with a retry option if the fetch fails
+- Add appropriate empty state message when no requests exist
+- Ensure approving or rejecting a request updates the list immediately without a page refresh
 
-**User-visible outcome:** Administrators can reliably create and identify secondary admin accounts with correct roles and permissions, and can view and filter pending user requests from the admin dashboard without data being missing or incorrectly mapped.
+**User-visible outcome:** Admin users can open the Request Management module and see all approval requests (pending, approved, rejected) with correct user details, along with proper loading, empty, and error states.

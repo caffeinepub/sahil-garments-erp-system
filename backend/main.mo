@@ -14,10 +14,8 @@ import AccessControl "authorization/access-control";
 import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
-import Migration "migration";
 import Debug "mo:core/Debug";
 
-(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -535,6 +533,13 @@ actor {
     Debug.print("Backend: approval request lifecycle complete for " # caller.toText());
   };
 
+  public shared query ({ caller }) func getApprovalRequests() : async [UserApproval.UserApprovalInfo] {
+    requirePrimaryAdmin(caller);
+    let allApprovals = UserApproval.listApprovals(approvalState);
+    Debug.print("Backend: getApprovalRequests returning " # allApprovals.size().toText() # " total approval records");
+    allApprovals;
+  };
+
   public shared ({ caller }) func approveUser(user : Principal) : async () {
     requirePrimaryAdmin(caller);
 
@@ -644,18 +649,10 @@ actor {
     ignore createNotificationInternal(caller, "User Status Updated", "You have rejected user " # userName);
   };
 
-  public shared ({ caller }) func listApprovals() : async [UserApproval.UserApprovalInfo] {
+  public shared query ({ caller }) func listApprovals() : async [UserApproval.UserApprovalInfo] {
     requirePrimaryAdmin(caller);
     let allApprovals = UserApproval.listApprovals(approvalState);
-    let debugList = allApprovals.map(
-      func(info) {
-        {
-          principal = info.principal;
-          status = info.status;
-        };
-      }
-    );
-    Debug.print("Backend: ListApprovals triggered from active admin portal. Returning all approval requests: " # debugList.size().toText());
+    Debug.print("Backend: ListApprovals triggered from active admin portal. Returning all approval requests: " # allApprovals.size().toText());
     allApprovals;
   };
 
@@ -766,6 +763,9 @@ actor {
     userAccounts.add(caller, userAccount);
   };
 
+  // Grants a user an AppRole. When the role is #admin, the user is also promoted
+  // in the AccessControl layer so that AccessControl.isAdmin() returns true for
+  // them, giving them the same permissions as any other admin throughout the system.
   public shared ({ caller }) func assignAppRole(user : Principal, role : AppRole) : async () {
     requirePrimaryAdmin(caller);
 
@@ -778,8 +778,24 @@ actor {
 
     userAppRoles.add(user, role);
 
-    if (AccessControl.isAdmin(accessControlState, user)) {
-      adminPrincipals.add(user);
+    // When assigning the admin AppRole, also promote the user in the
+    // AccessControl layer so all isAdmin() / hasPermission(#admin) checks pass.
+    switch (role) {
+      case (#admin) {
+        // assignRole has its own admin-only guard; caller is a primary admin here.
+        AccessControl.assignRole(accessControlState, caller, user, #admin);
+        secondaryAdminPrincipals.add(user);
+        adminPrincipals.add(user);
+      };
+      case (_) {
+        // For non-admin roles, if the user was previously promoted to admin,
+        // demote them back to a regular user in the AccessControl layer.
+        if (AccessControl.isAdmin(accessControlState, user)) {
+          AccessControl.assignRole(accessControlState, caller, user, #user);
+          secondaryAdminPrincipals.remove(user);
+          adminPrincipals.remove(user);
+        };
+      };
     };
 
     switch (userAccounts.get(user)) {

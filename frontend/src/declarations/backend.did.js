@@ -64,6 +64,15 @@ export const BarcodeExportRequest = IDL.Record({
   'exportType' : BarcodeExportFormat,
   'productId' : IDL.Nat,
 });
+export const ApprovalStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const UserApprovalInfo = IDL.Record({
+  'status' : ApprovalStatus,
+  'principal' : IDL.Principal,
+});
 export const UserProfile = IDL.Record({
   'appRole' : AppRole,
   'name' : IDL.Text,
@@ -140,15 +149,6 @@ export const OrderRecord = IDL.Record({
   'quantity' : IDL.Nat,
   'customerId' : IDL.Nat,
   'totalPrice' : IDL.Nat,
-});
-export const ApprovalStatus = IDL.Variant({
-  'pending' : IDL.Null,
-  'approved' : IDL.Null,
-  'rejected' : IDL.Null,
-});
-export const UserApprovalInfo = IDL.Record({
-  'status' : ApprovalStatus,
-  'principal' : IDL.Principal,
 });
 export const InventoryStatus = IDL.Variant({
   'low' : IDL.Null,
@@ -300,6 +300,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'exportProductBarcode' : IDL.Func([BarcodeExportRequest], [ExternalBlob], []),
+  'getApprovalRequests' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'getBootstrapState' : IDL.Func([], [AppBootstrapState], ['query']),
   'getBootstrapStatus' : IDL.Func([], [BootstrapStatus], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
@@ -347,7 +348,7 @@ export const idlService = IDL.Service({
   'isPreviouslyRejected' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
   'isSalesManager' : IDL.Func([], [IDL.Bool], ['query']),
   'isSuperAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], []),
+  'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'listCustomers' : IDL.Func([], [IDL.Vec(Customer)], ['query']),
   'listDataEntries' : IDL.Func([], [IDL.Vec(DataEntry)], ['query']),
   'listInventory' : IDL.Func([], [IDL.Vec(InventoryRecord)], ['query']),
@@ -447,6 +448,15 @@ export const idlFactory = ({ IDL }) => {
     'exportType' : BarcodeExportFormat,
     'productId' : IDL.Nat,
   });
+  const ApprovalStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const UserApprovalInfo = IDL.Record({
+    'status' : ApprovalStatus,
+    'principal' : IDL.Principal,
+  });
   const UserProfile = IDL.Record({
     'appRole' : AppRole,
     'name' : IDL.Text,
@@ -523,15 +533,6 @@ export const idlFactory = ({ IDL }) => {
     'quantity' : IDL.Nat,
     'customerId' : IDL.Nat,
     'totalPrice' : IDL.Nat,
-  });
-  const ApprovalStatus = IDL.Variant({
-    'pending' : IDL.Null,
-    'approved' : IDL.Null,
-    'rejected' : IDL.Null,
-  });
-  const UserApprovalInfo = IDL.Record({
-    'status' : ApprovalStatus,
-    'principal' : IDL.Principal,
   });
   const InventoryStatus = IDL.Variant({
     'low' : IDL.Null,
@@ -687,6 +688,11 @@ export const idlFactory = ({ IDL }) => {
         [ExternalBlob],
         [],
       ),
+    'getApprovalRequests' : IDL.Func(
+        [],
+        [IDL.Vec(UserApprovalInfo)],
+        ['query'],
+      ),
     'getBootstrapState' : IDL.Func([], [AppBootstrapState], ['query']),
     'getBootstrapStatus' : IDL.Func([], [BootstrapStatus], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
@@ -738,7 +744,7 @@ export const idlFactory = ({ IDL }) => {
     'isPreviouslyRejected' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
     'isSalesManager' : IDL.Func([], [IDL.Bool], ['query']),
     'isSuperAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], []),
+    'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'listCustomers' : IDL.Func([], [IDL.Vec(Customer)], ['query']),
     'listDataEntries' : IDL.Func([], [IDL.Vec(DataEntry)], ['query']),
     'listInventory' : IDL.Func([], [IDL.Vec(InventoryRecord)], ['query']),

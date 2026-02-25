@@ -1,121 +1,56 @@
 {
   "kind": "build_request",
-  "title": "Secondary Admin Role Permissions & User Role Mapping Fix",
-  "projectName": "Sahil Garments ERP",
+  "title": "Fix: Approval requests not loading in Request Management module",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "In the backend, ensure the secondary admin role definition includes the following permissions explicitly set to enabled: Login Access, View User Requests, and Approve/Reject Requests. These permissions must be stored and enforced as part of the role's access control configuration.",
-      "target": "backend",
+      "text": "Investigate and fix the issue where user approval requests are not appearing/loading in the Request Management module. Ensure the list of pending, approved, and rejected requests renders correctly for admin users, including proper data fetching, error handling, and loading states.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-7"
+          "msg-1"
         ],
         "quotes": [
-          "Role me ye permissions honi chahiye: Login access = Enabled, View user requests = Enabled, Approve / Reject requests = Enabled"
+          "Request nahi aa raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "A secondary admin role record in the backend has Login Access = Enabled",
-        "A secondary admin role record has View User Requests = Enabled",
-        "A secondary admin role record has Approve/Reject Requests = Enabled",
-        "These permissions are enforced during authorization checks for secondary admin users"
+        "Admin users can see the list of approval requests in the Request Management module without errors",
+        "Pending requests are displayed with correct user details (name, email, role, department)",
+        "The module shows an appropriate empty state message when there are no requests",
+        "Loading spinner is shown while requests are being fetched",
+        "Error state is shown with a retry option if the fetch fails",
+        "Approving or rejecting a request updates the list immediately without requiring a page refresh"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the user role mapping bug where a secondary admin account is sometimes persisted with the normal user role instead of Admin or Sub Admin. When creating or updating a secondary admin user, validate that the role is set to 'Admin' or 'Sub Admin', status is set to 'Active', and access modules include 'User Management' and 'Request Management' before saving.",
+      "text": "Verify and fix the backend query that returns user approval requests. Ensure the `getApprovalRequests` (or equivalent) backend function returns all requests correctly and is not filtering out valid entries due to a logic bug or stale state after upgrade.",
       "target": "backend",
       "source": {
         "messageIds": [
-          "msg-7"
+          "msg-1"
         ],
         "quotes": [
-          "Kabhi-kabhi secondary admin ka account normal user role me save ho jata hai.",
-          "Role = Admin ya Sub Admin, Status = Active, Access modules = User Management, Request Management"
+          "Request nahi aa raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "Secondary admin accounts are saved with role value of 'Admin' or 'Sub Admin', never 'User'",
-        "Secondary admin accounts have status set to 'Active'",
-        "Secondary admin accounts have 'User Management' included in their access modules",
-        "Secondary admin accounts have 'Request Management' included in their access modules",
-        "Existing secondary admin records that were incorrectly saved as normal users are corrected upon backend upgrade/migration"
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "text": "In the User Management admin panel frontend, display each user's role, status, and assigned access modules clearly. For secondary admin users, show a visual indicator (e.g., a badge or tag) if their role is misconfigured (not Admin/Sub Admin) or their status is not Active, so administrators can identify and correct role mapping issues at a glance.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-7"
-        ],
-        "quotes": [
-          "Role = Admin ya Sub Admin, Status = Active, Access modules = User Management, Request Management"
-        ]
-      },
-      "acceptanceCriteria": [
-        "The User Management module displays a 'Role' column showing the user's current role",
-        "The User Management module displays a 'Status' column showing Active/Inactive",
-        "The User Management module displays assigned access modules for each user",
-        "Users with a misconfigured role (expected Admin/Sub Admin but saved as User) are visually highlighted with a warning badge",
-        "Admins can see at a glance which secondary admin accounts have incorrect role mappings"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "text": "In the backend, ensure that user requests (approval/pending requests) are correctly fetched and returned via the admin API. Verify that the query for pending requests filters by status = Pending and returns all relevant request data. Expose or fix the existing endpoint so that the admin dashboard's Request Management module can retrieve and display pending user requests.",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-3"
-        ],
-        "quotes": [
-          "Request table ka data check karein database me.",
-          "Request status = Pending",
-          "Admin dashboard me request API connected ho."
-        ]
-      },
-      "acceptanceCriteria": [
-        "The backend returns pending user requests when queried by an Admin or Sub Admin",
-        "Requests with status = Pending are included in the results",
-        "The API does not return an empty list when pending requests exist in the data store"
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "text": "In the admin dashboard frontend, update the Request Management module to correctly call the backend API for user requests and display them. Add a filter control allowing admins to select 'Pending', 'All', or other relevant statuses. Ensure the component re-fetches data on mount and displays an empty state message when no requests match the current filter.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-3"
-        ],
-        "quotes": [
-          "Admin dashboard me request API connected ho.",
-          "Filter → Pending / All requests select karein."
-        ]
-      },
-      "acceptanceCriteria": [
-        "The Request Management module displays user requests fetched from the backend",
-        "A filter control exists with options: 'All', 'Pending', and other relevant statuses",
-        "Selecting 'Pending' filters the list to show only pending requests",
-        "The list refreshes on module load",
-        "An empty state message is shown when no requests match the filter"
+        "Backend returns all stored approval requests when queried by an admin principal",
+        "No runtime trap or silent empty result is returned when requests exist in stable storage",
+        "Newly submitted approval requests are immediately visible in subsequent query results"
       ]
     }
   ],
   "constraints": [
-    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui",
-    "All backend logic must remain in the single main actor (backend/main.mo)",
-    "Only generate migration.mo if existing stable state variables need to be upgraded"
+    "Do not change the authentication flow or Internet Identity integration",
+    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui"
   ],
   "nonGoals": [
-    "Building a new authentication system or replacing Internet Identity",
-    "Adding email/SMS-based password reset (not supported on this platform)",
-    "Implementing real-time WebSocket notifications for request updates",
-    "Changing the overall ERP module structure or navigation"
+    "Adding new features to the Request Management module",
+    "Changing the approval workflow or role permission model",
+    "UI redesign of the Request Management module"
   ],
   "imageRequirements": {
     "required": [],

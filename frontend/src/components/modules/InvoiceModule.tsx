@@ -120,14 +120,12 @@ export default function InvoiceModule({ userProfile }: InvoiceModuleProps) {
       } catch (stockError: any) {
         const errorResult = parseStockError(stockError);
         toast.error(errorResult.message);
-        console.error('Stock adjustment error:', stockError);
       }
 
       setShowPreview(true);
     } catch (error: any) {
       const errorResult = parseStockError(error);
       toast.error(errorResult.message);
-      console.error('Invoice creation error:', error);
     }
   };
 
@@ -212,18 +210,10 @@ export default function InvoiceModule({ userProfile }: InvoiceModuleProps) {
 
             {selectedCustomer && (
               <div className="p-4 bg-muted rounded-lg space-y-2">
-                <p className="text-sm">
-                  <span className="font-semibold">Name:</span> {selectedCustomer.name}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Email:</span> {selectedCustomer.email}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Phone:</span> {selectedCustomer.phone}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Address:</span> {selectedCustomer.address}
-                </p>
+                <p className="text-sm"><span className="font-semibold">Name:</span> {selectedCustomer.name}</p>
+                <p className="text-sm"><span className="font-semibold">Email:</span> {selectedCustomer.email}</p>
+                <p className="text-sm"><span className="font-semibold">Phone:</span> {selectedCustomer.phone}</p>
+                <p className="text-sm"><span className="font-semibold">Address:</span> {selectedCustomer.address}</p>
               </div>
             )}
           </CardContent>

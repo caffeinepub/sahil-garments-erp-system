@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, User, Mail, Building2, Briefcase } from 'lucide-react';
+import { Loader2, User, Mail, Building2, Briefcase, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseProfileSaveError } from '../utils/approvalErrors';
 
@@ -38,35 +38,26 @@ export default function ProfileSetup() {
       return;
     }
 
-    console.group('[ProfileSetup] Form submission started');
-    console.log('[ProfileSetup] Timestamp:', new Date().toISOString());
-    console.log('[ProfileSetup] Form data:', { name, email, department, appRole });
-
     try {
       // Step 1: Save profile
-      console.log('[ProfileSetup] Step 1: Saving profile...');
       await saveProfileMutation.mutateAsync({
         name: name.trim(),
         email: email.trim(),
         department: department.trim(),
         appRole,
       });
-      console.log('[ProfileSetup] ✓ Profile saved successfully');
 
-      // Step 2: Request approval
-      console.log('[ProfileSetup] Step 2: Requesting approval...');
-      await requestApprovalMutation.mutateAsync();
-      console.log('[ProfileSetup] ✓ Approval requested successfully');
+      // Step 2: Request approval (skip for admin role as they are auto-approved)
+      if (appRole !== AppRole.admin) {
+        await requestApprovalMutation.mutateAsync();
+      }
 
-      console.log('[ProfileSetup] ✓ Complete flow finished successfully');
-      console.groupEnd();
-
-      toast.success('Profile created! Waiting for admin approval.');
+      toast.success(
+        appRole === AppRole.admin
+          ? 'Admin profile created successfully!'
+          : 'Profile created! Waiting for admin approval.'
+      );
     } catch (error: any) {
-      console.error('[ProfileSetup] ✗ Error during submission');
-      console.error('[ProfileSetup] Error:', error);
-      console.groupEnd();
-
       const errorInfo = parseProfileSaveError(error);
       toast.error(errorInfo.message);
     }
@@ -148,14 +139,26 @@ export default function ProfileSetup() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={AppRole.admin}>
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-3 h-3 text-purple-600" />
+                      <span>Admin</span>
+                    </div>
+                  </SelectItem>
                   <SelectItem value={AppRole.sales}>Sales</SelectItem>
                   <SelectItem value={AppRole.inventoryManager}>Inventory Manager</SelectItem>
                   <SelectItem value={AppRole.accountant}>Accountant</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Note: Admin roles can only be assigned by existing administrators
-              </p>
+              {appRole === AppRole.admin ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Admin role requires your email to be pre-authorized by a system administrator.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Admin roles can only be assigned by existing administrators.
+                </p>
+              )}
             </div>
 
             <Button

@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, LogOut, User, ChevronDown } from 'lucide-react';
+import { Moon, Sun, LogOut, User, ChevronDown, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,11 +12,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { useQueryClient } from '@tanstack/react-query';
-import { useIsSuperAdmin } from '../hooks/useQueries';
-import { UserProfile, AppRole } from '../backend';
+import { useIsSuperAdmin, useIsAdminRole } from '../hooks/useQueries';
+import { AppBootstrapState, AppRole } from '../backend';
 
 interface HeaderProps {
-  userProfile: UserProfile | null;
+  bootstrapData?: AppBootstrapState | null;
+  userProfile?: { name?: string; appRole?: AppRole } | null;
   onLogout?: () => void;
 }
 
@@ -30,11 +31,15 @@ function getRoleLabel(role: AppRole | undefined): string {
   }
 }
 
-export default function Header({ userProfile, onLogout }: HeaderProps) {
+export default function Header({ bootstrapData, userProfile: userProfileProp, onLogout }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const { clear, identity } = useInternetIdentity();
   const queryClient = useQueryClient();
   const { data: isSuperAdmin } = useIsSuperAdmin();
+  const isAdminRole = useIsAdminRole(bootstrapData);
+
+  // Support both prop styles
+  const resolvedProfile = userProfileProp ?? bootstrapData?.userProfile ?? null;
 
   const handleLogout = async () => {
     await clear();
@@ -42,8 +47,8 @@ export default function Header({ userProfile, onLogout }: HeaderProps) {
     onLogout?.();
   };
 
-  const displayName = userProfile?.name ?? identity?.getPrincipal().toString().slice(0, 12) ?? 'User';
-  const roleLabel = getRoleLabel(userProfile?.appRole);
+  const displayName = resolvedProfile?.name ?? identity?.getPrincipal().toString().slice(0, 12) ?? 'User';
+  const roleLabel = getRoleLabel(resolvedProfile?.appRole);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -80,7 +85,11 @@ export default function Header({ userProfile, onLogout }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 gap-2 px-2">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="w-3.5 h-3.5 text-primary" />
+                  {isAdminRole ? (
+                    <Shield className="w-3.5 h-3.5 text-primary" />
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-primary" />
+                  )}
                 </div>
                 <div className="hidden sm:block text-left">
                   <p className="text-xs font-medium leading-tight">{displayName}</p>
@@ -96,6 +105,9 @@ export default function Header({ userProfile, onLogout }: HeaderProps) {
                   <p className="text-xs text-muted-foreground font-normal">{roleLabel}</p>
                   {isSuperAdmin && (
                     <p className="text-xs text-primary font-normal">Primary Admin</p>
+                  )}
+                  {!isSuperAdmin && isAdminRole && (
+                    <p className="text-xs text-primary font-normal">Admin</p>
                   )}
                 </div>
               </DropdownMenuLabel>

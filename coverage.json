@@ -1,86 +1,51 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-24T12:35:47.300Z",
+  "generatedAt": "2026-02-25T04:36:49.520Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 5,
-    "implemented": 2,
+    "total": 2,
+    "implemented": 1,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "In the backend, ensure the secondary admin role definition includes the following permissions explicitly set to enabled: Login Access, View User Requests, and Approve/Reject Requests. These permissions must be stored and enforced as part of the role's access control configuration.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Investigate and fix the issue where user approval requests are not appearing/loading in the Request Management module. Ensure the list of pending, approved, and rejected requests renders correctly for admin users, including proper data fetching, error handling, and loading states.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/modules/RequestManagementModule.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/modules/RequestManagementModule.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ]
       },
       {
         "id": "REQ-2",
-        "summary": "Fix the user role mapping bug where a secondary admin account is sometimes persisted with the normal user role instead of Admin or Sub Admin. When creating or updating a secondary admin user, validate that the role is set to 'Admin' or 'Sub Admin', status is set to 'Active', and access modules include 'User Management' and 'Request Management' before saving.",
+        "summary": "Verify and fix the backend query that returns user approval requests. Ensure the `getApprovalRequests` (or equivalent) backend function returns all requests correctly and is not filtering out valid entries due to a logic bug or stale state after upgrade.",
         "status": "unknown",
         "plannedFiles": [],
         "matchedFiles": []
-      },
-      {
-        "id": "REQ-3",
-        "summary": "In the User Management admin panel frontend, display each user's role, status, and assigned access modules clearly. For secondary admin users, show a visual indicator (e.g., a badge or tag) if their role is misconfigured (not Admin/Sub Admin) or their status is not Active, so administrators can identify and correct role mapping issues at a glance.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/modules/UserManagementModule.tsx",
-          "frontend/src/hooks/useQueries.ts"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/modules/UserManagementModule.tsx",
-          "frontend/src/hooks/useQueries.ts"
-        ]
-      },
-      {
-        "id": "REQ-4",
-        "summary": "In the backend, ensure that user requests (approval/pending requests) are correctly fetched and returned via the admin API. Verify that the query for pending requests filters by status = Pending and returns all relevant request data. Expose or fix the existing endpoint so that the admin dashboard's Request Management module can retrieve and display pending user requests.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-5",
-        "summary": "In the admin dashboard frontend, update the Request Management module to correctly call the backend API for user requests and display them. Add a filter control allowing admins to select 'Pending', 'All', or other relevant statuses. Ensure the component re-fetches data on mount and displays an empty state message when no requests match the current filter.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/modules/RequestManagementModule.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/components/Sidebar.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/modules/RequestManagementModule.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/components/Sidebar.tsx"
-        ]
       }
     ]
   },
   "changedFiles": [
     "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
-    "caffeine.lock.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/App.tsx",
-    "frontend/src/components/ApprovalPending.tsx",
-    "frontend/src/components/Header.tsx",
-    "frontend/src/components/Sidebar.tsx",
-    "frontend/src/components/modules/CustomersModule.tsx",
-    "frontend/src/components/modules/ReportsModule.tsx",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
     "frontend/src/components/modules/RequestManagementModule.tsx",
-    "frontend/src/components/modules/UserManagementModule.tsx",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/Dashboard.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",
