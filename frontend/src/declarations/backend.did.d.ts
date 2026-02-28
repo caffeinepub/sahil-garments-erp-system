@@ -19,6 +19,11 @@ export type AppRole = { 'accountant' : null } |
   { 'admin' : null } |
   { 'sales' : null } |
   { 'inventoryManager' : null };
+export interface ApprovalRequest {
+  'status' : UserApprovalStatus,
+  'principal' : Principal,
+  'timestamp' : Time,
+}
 export type ApprovalStatus = { 'pending' : null } |
   { 'approved' : null } |
   { 'rejected' : null };
@@ -161,6 +166,9 @@ export interface UserApprovalInfo {
   'status' : ApprovalStatus,
   'principal' : Principal,
 }
+export type UserApprovalStatus = { 'pending' : null } |
+  { 'approved' : null } |
+  { 'rejected' : null };
 export interface UserProfile {
   'appRole' : AppRole,
   'name' : string,
@@ -242,6 +250,7 @@ export interface _SERVICE {
     ExternalBlob
   >,
   'exportProductBarcode' : ActorMethod<[BarcodeExportRequest], ExternalBlob>,
+  'getAllApprovalRequests' : ActorMethod<[], Array<ApprovalRequest>>,
   'getApprovalRequests' : ActorMethod<[], Array<UserApprovalInfo>>,
   'getBootstrapState' : ActorMethod<[], AppBootstrapState>,
   'getBootstrapStatus' : ActorMethod<[], BootstrapStatus>,

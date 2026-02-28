@@ -1,42 +1,67 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-25T04:50:15.725Z",
+  "generatedAt": "2026-02-26T14:27:52.535Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 2,
+    "total": 5,
+    "implemented": 3,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Investigate and fix the ProfileSetup form so that submitting profile information (name, email, department, role) successfully saves the profile and advances the user past the setup screen to the next appropriate state (approval pending or dashboard).",
+        "summary": "Fix the profile setup flow so that when a new user submits their profile (name, email, department), the data is correctly saved to the backend and an approval request is persisted and visible to admins in the Request Management Module.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/ProfileSetup.tsx"
+          "frontend/src/components/ProfileSetup.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/utils/approvalErrors.ts"
         ],
         "matchedFiles": [
-          "frontend/src/components/ProfileSetup.tsx"
+          "frontend/src/components/ProfileSetup.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen. Ensure the condition that decides whether to show ProfileSetup, ApprovalPending, or the Dashboard is evaluated correctly after the profile save mutation completes.",
+        "summary": "Fix the User Management Module so that all registered users appear in the admin's user table with correct profile data, and approve/reject/role-change/delete actions execute successfully without errors.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/App.tsx",
+          "frontend/src/components/modules/UserManagementModule.tsx",
           "frontend/src/hooks/useQueries.ts"
         ],
         "matchedFiles": [
-          "frontend/src/App.tsx",
+          "frontend/src/components/modules/UserManagementModule.tsx",
           "frontend/src/hooks/useQueries.ts"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Audit the backend saveProfile (or equivalent) endpoint in main.mo to ensure it correctly persists the user's profile data and returns a success response. Verify that the profile is associated with the caller's principal and that the stored profile is reflected in subsequent bootstrap/getProfile calls.",
+        "summary": "Fix the ApprovalPending screen so that the auto-polling (every 15 seconds) and manual refresh correctly detect when a user has been approved, and redirect the user to the Dashboard upon approval.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/ApprovalPending.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/App.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/ApprovalPending.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/App.tsx"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Fix the backend to ensure that approval requests are correctly stored in stable storage (approvalRequests map), survive canister upgrades, and are retrievable by admin query functions.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
+      },
+      {
+        "id": "REQ-5",
+        "summary": "Ensure that after an admin approves or rejects a user, a notification is created for that user so they can see the outcome in the Notifications Module.",
         "status": "unknown",
         "plannedFiles": [],
         "matchedFiles": []
@@ -44,13 +69,21 @@
     ]
   },
   "changedFiles": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
     "frontend/src/App.tsx",
+    "frontend/src/components/ApprovalPending.tsx",
+    "frontend/src/components/Header.tsx",
     "frontend/src/components/ProfileSetup.tsx",
+    "frontend/src/components/Sidebar.tsx",
+    "frontend/src/components/modules/RequestManagementModule.tsx",
+    "frontend/src/components/modules/UserManagementModule.tsx",
     "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/Dashboard.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

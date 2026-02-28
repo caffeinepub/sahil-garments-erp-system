@@ -1,32 +1,49 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-25T04:50:15.722Z",
-  "summary": "The diff addresses REQ-1 and REQ-2 through frontend changes to ProfileSetup.tsx, App.tsx, and useQueries.ts. REQ-3 (backend audit of main.mo) is not addressed in the diff at all — no backend file was modified.",
+  "generatedAt": "2026-02-26T14:27:52.532Z",
+  "summary": "The diff implements substantial changes across frontend and backend files addressing all five requirements. REQ-1 through REQ-5 have corresponding implementation evidence, but several critical backend acceptance criteria cannot be verified because backend/main.mo is truncated. Key concerns: REQ-4 requires the approvalRequests map to be in stable storage in main.mo, and REQ-5 requires notification creation logic on approve/reject — both depend on main.mo content that is cut off. The migration.mo file is present and addresses upgrade persistence. Frontend changes for REQ-1, REQ-2, REQ-3 appear complete. REQ-5 notification display in the frontend NotificationsModule is referenced in the file summaries.",
   "missing_requirements": [
     {
-      "id": "REQ-3",
-      "requirement": "Audit the backend saveProfile (or equivalent) endpoint in main.mo to ensure it correctly persists the user's profile data and returns a success response. Verify that the profile is associated with the caller's principal and that the stored profile is reflected in subsequent bootstrap/getProfile calls.",
-      "reason": "No changes were made to backend/main.mo or any backend file. The diff shows 0 added files and 5 modified files, all of which are frontend files. The backend audit and any fixes to saveProfile persistence, error variants, or getBootstrap reflection are entirely absent.",
-      "evidence": []
+      "id": "REQ-4",
+      "requirement": "The approvalRequests map is declared in stable storage in main.mo and approval/rejection mutations update the correct entry.",
+      "reason": "backend/main.mo is truncated and does not show the stable variable declarations or the approve/reject mutation implementations. Cannot confirm the approvalRequests map is declared as stable or that mutations update it correctly.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "requirement": "Approving a user creates a notification of type 'approval' and rejecting creates a notification of type 'rejection' targeted at that user's principal in the backend.",
+      "reason": "The notification creation logic on approve/reject must reside in backend/main.mo, which is truncated. The frontend NotificationsModule is referenced as displaying notifications, but the backend logic that creates approval/rejection notifications cannot be confirmed from the diff.",
+      "evidence": [
+        "backend/main.mo"
+      ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Role selection field removed from ProfileSetup form; role is hardcoded to AppRole.sales with a note that admin assigns the correct role after approval.",
-      "reason": "The build request does not ask to remove the role field from the form. REQ-1 explicitly lists 'role' as one of the required fields the user should be able to fill in. The diff removes role selection and replaces it with a hardcoded default, which contradicts the stated AC.",
+      "description": "migration.mo resets all existing approvalRequest timestamps to Time.now() during migration, modifying existing data.",
+      "reason": "The build request only asks that state persists correctly across canister upgrades. The migration.mo implementation overwrites all existing timestamps with the current time during migration, which is a data-mutating behavior not requested.",
       "evidence": [
-        "frontend/src/components/ProfileSetup.tsx",
-        "frontend-file-summaries.txt"
+        "backend/migration.mo"
       ]
     }
   ],
-  "confidence": 0.87,
+  "confidence": 0.62,
   "changed_files": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "frontend-file-summaries.txt",
     "frontend/src/App.tsx",
+    "frontend/src/components/ApprovalPending.tsx",
+    "frontend/src/components/Header.tsx",
     "frontend/src/components/ProfileSetup.tsx",
+    "frontend/src/components/Sidebar.tsx",
+    "frontend/src/components/modules/RequestManagementModule.tsx",
+    "frontend/src/components/modules/UserManagementModule.tsx",
     "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/Dashboard.tsx",
     "project_state.json"
   ]
 }

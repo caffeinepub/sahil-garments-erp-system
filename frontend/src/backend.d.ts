@@ -62,6 +62,11 @@ export interface DataEntry {
     entityType: string;
     amount: bigint;
 }
+export interface ApprovalRequest {
+    status: UserApprovalStatus;
+    principal: Principal;
+    timestamp: Time;
+}
 export interface BootstrapStatus {
     canisterStatus?: SystemStatus;
     backendAvailable: boolean;
@@ -159,11 +164,6 @@ export enum AppRole {
     sales = "sales",
     inventoryManager = "inventoryManager"
 }
-export enum ApprovalStatus {
-    pending = "pending",
-    approved = "approved",
-    rejected = "rejected"
-}
 export enum BarcodeExportFormat {
     pdf = "pdf",
     png = "png"
@@ -186,6 +186,11 @@ export enum T {
     sent = "sent",
     overdue = "overdue",
     draft = "draft"
+}
+export enum UserApprovalStatus {
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
 }
 export enum UserRole {
     admin = "admin",
@@ -214,6 +219,7 @@ export interface backendInterface {
     deleteNotification(notificationId: bigint): Promise<boolean>;
     exportInvoiceHistory(arg0: InvoiceExportFormat, arg1: InvoiceFilter | null, arg2: string | null, arg3: string | null): Promise<ExternalBlob>;
     exportProductBarcode(arg0: BarcodeExportRequest): Promise<ExternalBlob>;
+    getAllApprovalRequests(): Promise<Array<ApprovalRequest>>;
     getApprovalRequests(): Promise<Array<UserApprovalInfo>>;
     getBootstrapState(): Promise<AppBootstrapState>;
     getBootstrapStatus(): Promise<BootstrapStatus>;

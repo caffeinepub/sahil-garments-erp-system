@@ -1,139 +1,191 @@
-import { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
-import { useGetBootstrapState } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { useIsCallerApproved, useListNotifications } from '../hooks/useQueries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, XCircle, LogOut, RefreshCw } from 'lucide-react';
-import type { UserProfile } from '../backend';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Clock, RefreshCw, LogOut, Bell, CheckCircle } from 'lucide-react';
 
 interface ApprovalPendingProps {
-  userProfile: UserProfile;
+  onApproved?: () => void;
 }
 
-export default function ApprovalPending({ userProfile }: ApprovalPendingProps) {
+export default function ApprovalPending({ onApproved }: ApprovalPendingProps) {
   const { clear } = useInternetIdentity();
   const queryClient = useQueryClient();
+  const hasRedirected = useRef(false);
 
-  // Poll bootstrap state to detect approval/rejection changes
-  const { data: bootstrapState, refetch } = useGetBootstrapState();
+  // Poll approval status every 15 seconds
+  const {
+    data: isApproved,
+    isLoading: approvalLoading,
+    refetch: refetchApproval,
+    error: approvalError,
+  } = useIsCallerApproved({ refetchInterval: 15_000 });
 
-  // Check if user has been rejected
-  const isRejected = bootstrapState && !bootstrapState.isApproved && !bootstrapState.isAdmin;
+  // Also poll notifications every 15 seconds so user sees approval notification
+  const { data: notifications } = useListNotifications({ refetchInterval: 15_000 });
 
+  // Watch for approval and trigger redirect
   useEffect(() => {
-    // Poll every 5 seconds while waiting for approval
-    const interval = setInterval(() => {
-      refetch();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [refetch]);
-
-  useEffect(() => {
-    if (bootstrapState?.isApproved || bootstrapState?.isAdmin) {
-      console.log('[ApprovalPending] User approved, transitioning to dashboard');
+    if (isApproved === true && !hasRedirected.current) {
+      hasRedirected.current = true;
+      // Invalidate bootstrap state so App.tsx re-evaluates routing
+      queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+      queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
+      // Call onApproved callback if provided
+      onApproved?.();
     }
-  }, [bootstrapState]);
+  }, [isApproved, queryClient, onApproved]);
+
+  // Handle tab visibility — resume polling when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetchApproval();
+        queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetchApproval, queryClient]);
+
+  const handleManualRefresh = async () => {
+    await refetchApproval();
+    queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+    await queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
+  };
 
   const handleLogout = async () => {
     await clear();
     queryClient.clear();
   };
 
-  const handleRefresh = () => {
-    refetch();
-  };
+  // Count unread notifications for this user
+  const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
 
-  if (isRejected) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4">
-        <Card className="w-full max-w-md border-destructive">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
-              <XCircle className="w-8 h-8 text-destructive" />
-            </div>
-            <CardTitle className="text-2xl text-destructive">Account Rejected</CardTitle>
-            <CardDescription>
-              Your account approval request has been rejected
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg space-y-2">
-              <p className="text-sm font-medium">Account Details:</p>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p><strong>Name:</strong> {userProfile.name}</p>
-                <p><strong>Email:</strong> {userProfile.email}</p>
-                <p><strong>Department:</strong> {userProfile.department}</p>
-              </div>
-            </div>
-
-            <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-lg">
-              <p className="text-sm text-destructive">
-                Your account has been rejected by an administrator. Please contact your system administrator for more information or to request a review of this decision.
-              </p>
-            </div>
-
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              className="w-full"
-              size="lg"
-            >
-              <LogOut className="mr-2 h-5 w-5" />
-              Logout
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Check if there's an approval notification
+  const approvalNotification = notifications?.find(
+    (n) => n.title === 'Account Approved' || n.title === 'Account Rejected',
+  );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mb-4 animate-pulse">
-            <Clock className="w-8 h-8 text-white" />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md border-border shadow-lg">
+        <CardHeader className="text-center space-y-3">
+          <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+            {isApproved ? (
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            ) : (
+              <Clock className="w-8 h-8 text-primary" />
+            )}
           </div>
-          <CardTitle className="text-2xl">Approval Pending</CardTitle>
-          <CardDescription>
-            Your account is waiting for administrator approval
+          <CardTitle className="text-2xl font-bold text-foreground">
+            {isApproved ? 'Account Approved!' : 'Approval Pending'}
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            {isApproved
+              ? 'Your account has been approved. Redirecting to dashboard...'
+              : 'Your account is awaiting administrator approval. This page checks automatically every 15 seconds.'}
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4">
-          <div className="bg-muted p-4 rounded-lg space-y-2">
-            <p className="text-sm font-medium">Your Profile:</p>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p><strong>Name:</strong> {userProfile.name}</p>
-              <p><strong>Email:</strong> {userProfile.email}</p>
-              <p><strong>Department:</strong> {userProfile.department}</p>
+          {/* Approval detected — show redirect message */}
+          {isApproved && (
+            <Alert className="border-green-500/50 bg-green-500/10">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <AlertDescription className="text-green-700 dark:text-green-400">
+                Access granted! Loading your dashboard...
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Approval/Rejection notification banner */}
+          {approvalNotification && !isApproved && (
+            <Alert variant="destructive">
+              <AlertDescription>{approvalNotification.message}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Error state */}
+          {approvalError && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Could not check approval status. Please try refreshing.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Notification badge */}
+          {unreadCount > 0 && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <Bell className="w-4 h-4 text-primary" />
+              <span className="text-sm text-foreground">
+                You have <strong>{unreadCount}</strong> unread notification{unreadCount !== 1 ? 's' : ''}.
+                Check after approval.
+              </span>
             </div>
-          </div>
+          )}
 
-          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-            <p className="text-sm text-blue-900 dark:text-blue-100">
-              An administrator will review your request shortly. You will be notified once your account is approved.
-            </p>
-          </div>
+          {/* Status indicator */}
+          {!isApproved && (
+            <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Checking approval status automatically...</span>
+            </div>
+          )}
 
-          <div className="flex gap-2">
+          {/* Action buttons */}
+          <div className="space-y-2 pt-2">
+            {!isApproved && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleManualRefresh}
+                disabled={approvalLoading}
+              >
+                {approvalLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Check Now
+                  </>
+                )}
+              </Button>
+            )}
+
+            {isApproved && (
+              <Button
+                className="w-full"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+                  queryClient.refetchQueries({ queryKey: ['bootstrapState'] });
+                  onApproved?.();
+                }}
+              >
+                Go to Dashboard
+              </Button>
+            )}
+
             <Button
-              onClick={handleRefresh}
-              variant="outline"
-              className="flex-1"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh Status
-            </Button>
-            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground"
               onClick={handleLogout}
-              variant="outline"
-              className="flex-1"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </Button>
           </div>
+
+          <p className="text-xs text-center text-muted-foreground">
+            Contact your administrator if you've been waiting too long.
+          </p>
         </CardContent>
       </Card>
     </div>

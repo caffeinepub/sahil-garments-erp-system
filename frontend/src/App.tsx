@@ -1,97 +1,113 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import React from 'react';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
-import { useGetBootstrapState } from './hooks/useQueries';
+import { useGetBootstrapState, useGetCallerUserProfile } from './hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import LoginPage from './pages/LoginPage';
+import Dashboard from './pages/Dashboard';
 import ProfileSetup from './components/ProfileSetup';
 import ApprovalPending from './components/ApprovalPending';
 import LoadingWorkspace from './components/LoadingWorkspace';
-import AuthenticatedAppShell from './components/AuthenticatedAppShell';
-import InitializationError from './components/InitializationError';
-import { PollingProvider } from './context/PollingContext';
-import { isRejectedError } from './utils/approvalErrors';
-
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const { identity, isInitializing } = useInternetIdentity();
-  const isAuthenticated = !!identity;
   const queryClient = useQueryClient();
-  const [retryCount, setRetryCount] = useState(0);
+  const isAuthenticated = !!identity;
 
   const {
-    data: bootstrapState,
+    data: bootstrapData,
     isLoading: bootstrapLoading,
     isFetched: bootstrapFetched,
-    isRefetching: bootstrapRefetching,
-    error: bootstrapError,
     refetch: refetchBootstrap,
   } = useGetBootstrapState();
 
-  useEffect(() => {
-    if (bootstrapError) {
-      console.error('[App] Bootstrap error:', bootstrapError);
-    }
-  }, [bootstrapError]);
+  const {
+    data: userProfile,
+    isLoading: profileLoading,
+    isFetched: profileFetched,
+  } = useGetCallerUserProfile();
 
-  const handleRetry = async () => {
-    setRetryCount(prev => prev + 1);
-    await queryClient.invalidateQueries();
-    await refetchBootstrap();
+  const handleApproved = () => {
+    queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+    queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+    refetchBootstrap();
   };
 
+  // Show loading while identity is initializing
   if (isInitializing) {
     return <LoadingWorkspace />;
   }
 
+  // Not logged in — show login page
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
-  // Show loading shell while bootstrap data is being fetched or refetched
-  if (bootstrapLoading || !bootstrapFetched || bootstrapRefetching) {
-    return <AuthenticatedAppShell isLoading={true} />;
+  // Logged in but bootstrap data still loading
+  if (bootstrapLoading || !bootstrapFetched) {
+    return <LoadingWorkspace />;
   }
 
-  if (bootstrapError) {
-    if (isRejectedError(bootstrapError) && bootstrapState?.userProfile) {
-      return <ApprovalPending userProfile={bootstrapState.userProfile} />;
-    }
+  // Bootstrap failed or no data
+  if (!bootstrapData) {
     return (
-      <InitializationError
-        error={bootstrapError as Error}
-        onRetry={handleRetry}
-        isRetrying={bootstrapLoading}
-      />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4 p-8">
+          <p className="text-foreground text-lg">Failed to load application state.</p>
+          <button
+            onClick={() => refetchBootstrap()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
     );
   }
 
-  if (!bootstrapState) {
+  // Profile loading
+  if (profileLoading && !profileFetched) {
+    return <LoadingWorkspace />;
+  }
+
+  // No profile yet — show profile setup (skip for admins who may not need it)
+  const showProfileSetup =
+    isAuthenticated && profileFetched && userProfile === null && !bootstrapData.isAdmin;
+
+  if (showProfileSetup) {
     return (
-      <InitializationError
-        error={new Error('Bootstrap state is empty. Please try again.')}
-        onRetry={handleRetry}
-        isRetrying={bootstrapLoading}
-      />
+      <ErrorBoundary>
+        <ProfileSetup
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+            queryClient.invalidateQueries({ queryKey: ['bootstrapState'] });
+            refetchBootstrap();
+          }}
+        />
+      </ErrorBoundary>
     );
   }
 
-  // If no profile exists yet, show profile setup
-  if (!bootstrapState.userProfile) {
-    return <ProfileSetup />;
+  // User is authenticated but not yet approved
+  const showApprovalPending =
+    isAuthenticated &&
+    bootstrapFetched &&
+    !bootstrapData.isApproved &&
+    !bootstrapData.isAdmin &&
+    userProfile !== null;
+
+  if (showApprovalPending) {
+    return (
+      <ErrorBoundary>
+        <ApprovalPending onApproved={handleApproved} />
+      </ErrorBoundary>
+    );
   }
 
-  // Profile exists — check approval status
-  // Admins are always approved
-  if (!bootstrapState.isAdmin && !bootstrapState.isApproved) {
-    return <ApprovalPending userProfile={bootstrapState.userProfile} />;
-  }
-
+  // Approved or admin — show dashboard
   return (
-    <PollingProvider>
-      <Suspense fallback={<LoadingWorkspace />}>
-        <Dashboard bootstrapData={bootstrapState} />
-      </Suspense>
-    </PollingProvider>
+    <ErrorBoundary>
+      <Dashboard bootstrapData={bootstrapData} />
+    </ErrorBoundary>
   );
 }

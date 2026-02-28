@@ -1,4 +1,3 @@
-import Array "mo:core/Array";
 import List "mo:core/List";
 import Map "mo:core/Map";
 import Principal "mo:core/Principal";
@@ -14,8 +13,11 @@ import AccessControl "authorization/access-control";
 import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
+import Migration "migration";
 import Debug "mo:core/Debug";
 
+// Version 3.0
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -166,6 +168,12 @@ actor {
     userId : Principal;
   };
 
+  public type ApprovalRequest = {
+    principal : Principal;
+    status : UserApprovalStatus;
+    timestamp : Time.Time;
+  };
+
   public type BarcodeExportFormat = {
     #pdf;
     #png;
@@ -300,6 +308,7 @@ actor {
   let secondaryAdminEmails = Set.empty<Text>();
   let secondaryAdminPrincipals = Set.empty<Principal>();
   let userEmailToPrincipal = Map.empty<Text, Principal>();
+  let approvalRequests = Map.empty<Principal, ApprovalRequest>();
 
   var nextCustomerId = 1;
   var nextInventoryId = 1;
@@ -374,7 +383,7 @@ actor {
     hasAppRole(caller, #accountant);
   };
 
-  public query ({ caller }) func getBootstrapState() : async AppBootstrapState {
+  public shared query ({ caller }) func getBootstrapState() : async AppBootstrapState {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Authentication required");
     };
@@ -421,6 +430,15 @@ actor {
       if (previousRejectedUsers.contains(caller)) {
         Runtime.trap("Unauthorized: Your account has been rejected. Please contact an administrator.");
       };
+    };
+  };
+
+  // Requires only that the caller is an authenticated user (not guest).
+  // Used for endpoints that pending/unapproved users must also be able to access,
+  // such as reading their own notifications to learn about approval outcomes.
+  private func requireAuthenticatedUser(caller : Principal) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Authentication required");
     };
   };
 
@@ -522,6 +540,14 @@ actor {
       case (null) { caller.toText() };
     };
 
+    // Store persistent approval request
+    let approvalRequest : ApprovalRequest = {
+      principal = caller;
+      status = #pending;
+      timestamp = Time.now();
+    };
+    approvalRequests.add(caller, approvalRequest);
+
     Debug.print("Backend: notifying all admins about approval request from " # userName);
     for (adminPrincipal in adminPrincipals.values()) {
       ignore createNotificationInternal(
@@ -538,6 +564,11 @@ actor {
     let allApprovals = UserApproval.listApprovals(approvalState);
     Debug.print("Backend: getApprovalRequests returning " # allApprovals.size().toText() # " total approval records");
     allApprovals;
+  };
+
+  public shared query ({ caller }) func getAllApprovalRequests() : async [ApprovalRequest] {
+    requirePrimaryAdmin(caller);
+    approvalRequests.values().toArray();
   };
 
   public shared ({ caller }) func approveUser(user : Principal) : async () {
@@ -590,6 +621,18 @@ actor {
       case (null) { user.toText() };
     };
 
+    // Update persistent approval request
+    switch (approvalRequests.get(user)) {
+      case (null) {};
+      case (?request) {
+        let updatedRequest = {
+          request with status = #approved;
+        };
+        approvalRequests.add(user, updatedRequest);
+      };
+    };
+
+    // Notify the affected user of the approval outcome
     ignore createNotificationInternal(user, "Account Approved", "Your account has been approved. You can now access the dashboard.");
     ignore createNotificationInternal(caller, "User Status Updated", "You have approved user " # userName);
   };
@@ -645,6 +688,18 @@ actor {
       case (null) { user.toText() };
     };
 
+    // Update persistent approval request
+    switch (approvalRequests.get(user)) {
+      case (null) {};
+      case (?request) {
+        let updatedRequest = {
+          request with status = #rejected;
+        };
+        approvalRequests.add(user, updatedRequest);
+      };
+    };
+
+    // Notify the affected user of the rejection outcome
     ignore createNotificationInternal(user, "Account Rejected", "Your account approval request has been rejected. Please contact an administrator.");
     ignore createNotificationInternal(caller, "User Status Updated", "You have rejected user " # userName);
   };
@@ -763,9 +818,6 @@ actor {
     userAccounts.add(caller, userAccount);
   };
 
-  // Grants a user an AppRole. When the role is #admin, the user is also promoted
-  // in the AccessControl layer so that AccessControl.isAdmin() returns true for
-  // them, giving them the same permissions as any other admin throughout the system.
   public shared ({ caller }) func assignAppRole(user : Principal, role : AppRole) : async () {
     requirePrimaryAdmin(caller);
 
@@ -778,18 +830,13 @@ actor {
 
     userAppRoles.add(user, role);
 
-    // When assigning the admin AppRole, also promote the user in the
-    // AccessControl layer so all isAdmin() / hasPermission(#admin) checks pass.
     switch (role) {
       case (#admin) {
-        // assignRole has its own admin-only guard; caller is a primary admin here.
         AccessControl.assignRole(accessControlState, caller, user, #admin);
         secondaryAdminPrincipals.add(user);
         adminPrincipals.add(user);
       };
       case (_) {
-        // For non-admin roles, if the user was previously promoted to admin,
-        // demote them back to a regular user in the AccessControl layer.
         if (AccessControl.isAdmin(accessControlState, user)) {
           AccessControl.assignRole(accessControlState, caller, user, #user);
           secondaryAdminPrincipals.remove(user);
@@ -1400,8 +1447,12 @@ actor {
     userSignatures.get(user);
   };
 
+  // Notifications are accessible to any authenticated user (including pending/unapproved users)
+  // so that users waiting for approval can poll and see the outcome notification.
   public shared query ({ caller }) func listNotifications() : async [Notification] {
-    requireApprovedUserQuery(caller);
+    // Allow any authenticated (non-guest) user, including those pending approval,
+    // so the ApprovalPending screen can retrieve approval outcome notifications.
+    requireAuthenticatedUser(caller);
 
     let allNotifications = notifications.values().toArray();
 
@@ -1413,7 +1464,9 @@ actor {
   };
 
   public shared ({ caller }) func markNotificationAsRead(notificationId : Nat) : async Bool {
-    requireApprovedUser(caller);
+    // Allow any authenticated (non-guest) user, including those pending approval,
+    // so pending users can mark their approval outcome notifications as read.
+    requireAuthenticatedUser(caller);
 
     switch (notifications.get(notificationId)) {
       case (null) { false };
@@ -1620,5 +1673,7 @@ actor {
     previousRejectedUsers.remove(targetUser);
 
     UserApproval.setApproval(approvalState, targetUser, #rejected);
+
+    approvalRequests.remove(targetUser);
   };
 };

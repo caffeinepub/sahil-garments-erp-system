@@ -1,77 +1,116 @@
 {
   "kind": "build_request",
-  "title": "Fix 'Complete Your Profile' setup flow not completing",
+  "title": "Fix User Management and Profile Functionality",
   "projectName": "Sahil Garments ERP",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Investigate and fix the ProfileSetup form so that submitting profile information (name, email, department, role) successfully saves the profile and advances the user past the setup screen to the next appropriate state (approval pending or dashboard).",
-      "target": "frontend",
+      "text": "Fix the profile setup flow so that when a new user submits their profile (name, email, department), the data is correctly saved to the backend and an approval request is persisted and visible to admins in the Request Management Module.",
+      "target": "both",
       "source": {
         "messageIds": [
           "msg-6"
         ],
         "quotes": [
-          "complete your profile complete setup nahi ho raha hai"
+          "user management and profile proper work nahi kr raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "User can fill in all required fields (name, email, department, role) in the ProfileSetup form",
-        "Submitting the form does not leave the user stuck on the profile setup screen",
-        "After successful submission, user is navigated to the correct next state: approval pending screen (for roles requiring approval) or dashboard (for roles that do not require approval)",
-        "Error messages are displayed clearly if submission fails",
-        "No console errors or unhandled promise rejections occur during the profile setup flow"
+        "A new user can submit the ProfileSetup form without errors.",
+        "The submitted profile data (name, email, department, default 'sales' role) is stored in the backend.",
+        "An approval request entry is created and persisted in the backend's approvalRequests map after profile submission.",
+        "The admin's Request Management Module shows the new user's pending approval request after they register."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen. Ensure the condition that decides whether to show ProfileSetup, ApprovalPending, or the Dashboard is evaluated correctly after the profile save mutation completes.",
+      "text": "Fix the User Management Module so that all registered users appear in the admin's user table with correct profile data, and approve/reject/role-change/delete actions execute successfully without errors.",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "user management and profile proper work nahi kr raha hai"
+        ]
+      },
+      "acceptanceCriteria": [
+        "The admin User Management Module fetches and displays all user profiles correctly.",
+        "Approve action updates the user's approval status in the backend and the table reflects the change.",
+        "Reject action updates the user's status and the table reflects the change.",
+        "Role assignment dropdown updates the user's role in the backend without errors.",
+        "Delete action removes the user from the backend and the table updates accordingly."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Fix the ApprovalPending screen so that the auto-polling (every 15 seconds) and manual refresh correctly detect when a user has been approved, and redirect the user to the Dashboard upon approval.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-6"
         ],
         "quotes": [
-          "complete your profile complete setup nahi ho raha hai"
+          "user management and profile proper work nahi kr raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "After profile save completes successfully, bootstrap data is invalidated and re-fetched",
-        "App.tsx transitions to the correct screen based on the updated bootstrap state",
-        "User is never stuck in a loop returning to ProfileSetup after already submitting their profile",
-        "ApprovalPending screen is shown for roles that require admin approval",
-        "Dashboard is shown for roles that do not require admin approval"
+        "The ApprovalPending component polls the backend for approval status every 15 seconds without errors.",
+        "When an admin approves the user, the next poll (or manual refresh) detects the approved status.",
+        "The user is redirected from the ApprovalPending screen to the Dashboard after approval is detected."
       ]
     },
     {
-      "id": "REQ-3",
-      "text": "Audit the backend saveProfile (or equivalent) endpoint in main.mo to ensure it correctly persists the user's profile data and returns a success response. Verify that the profile is associated with the caller's principal and that the stored profile is reflected in subsequent bootstrap/getProfile calls.",
+      "id": "REQ-4",
+      "text": "Fix the backend to ensure that approval requests are correctly stored in stable storage (approvalRequests map), survive canister upgrades, and are retrievable by admin query functions.",
       "target": "backend",
       "source": {
         "messageIds": [
           "msg-6"
         ],
         "quotes": [
-          "complete your profile complete setup nahi ho raha hai"
+          "user management and profile proper work nahi kr raha hai"
         ]
       },
       "acceptanceCriteria": [
-        "Calling saveProfile with valid data persists the profile for the caller's principal",
-        "A subsequent getBootstrap or getProfile call returns the saved profile data",
-        "saveProfile returns a clear error variant if required fields are missing or invalid",
-        "No trap or unhandled error occurs during profile save"
+        "The approvalRequests map is declared in stable storage in main.mo.",
+        "Submitting a profile via requestApproval (or equivalent) adds an entry to approvalRequests.",
+        "The admin query to list pending approval requests returns the correct entries.",
+        "Approval/rejection mutations update the correct entry and are reflected in subsequent queries.",
+        "State persists correctly across canister upgrades via the migration module."
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Ensure that after an admin approves or rejects a user, a notification is created for that user so they can see the outcome in the Notifications Module.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "user management and profile proper work nahi kr raha hai"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Approving a user creates a notification of type 'approval' targeted at that user's principal.",
+        "Rejecting a user creates a notification of type 'rejection' targeted at that user's principal.",
+        "The user's Notifications Module displays these notifications after the admin action."
       ]
     }
   ],
   "constraints": [
-    "Do not modify files listed in frontend.immutablePaths: useInternetIdentity.ts, useActor.ts, main.tsx, and frontend/src/components/ui",
-    "Keep all Motoko logic in backend/main.mo (single-actor architecture)"
+    "Do not change the existing gold-and-black OKLCH color theme.",
+    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui.",
+    "All backend logic must remain in the single main actor (backend/main.mo).",
+    "Only generate migration.mo changes if stable state schema changes are required."
   ],
   "nonGoals": [
-    "Changing the visual design or layout of the ProfileSetup form",
-    "Adding new profile fields beyond what already exists",
-    "Modifying the approval/rejection logic in RequestManagementModule or UserManagementModule"
+    "Adding new roles or permissions beyond what already exists.",
+    "Redesigning the UI layout or color theme.",
+    "Adding new ERP modules (inventory, invoicing, orders, etc.).",
+    "Changing the authentication mechanism (Internet Identity stays as-is)."
   ],
   "imageRequirements": {
     "required": [],

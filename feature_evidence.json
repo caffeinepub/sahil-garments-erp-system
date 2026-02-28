@@ -2,10 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-investigate-and-fix-the-profilesetup-form-so-that-submitting-profile-information-name-email-department-role-successfully-saves-the-profile-and-advances-the-user-past-the-setup-screen-to-the-next-appropriate-state-approval-pending-or-dashboard",
-      "featureTitle": "Investigate and fix the ProfileSetup form so that submitting profile information (name, email, department, role) successfully saves the profile and advances the user past the setup screen to the next appropriate state (approval pending or dashboard).",
+      "featureId": "feature-fix-the-profile-setup-flow-so-that-when-a-new-user-submits-their-profile-name-email-department-the-data-is-correctly-saved-to-the-backend-and-an-approval-request-is-persisted-and-visible-to-admins-in-the-request-management-module",
+      "featureTitle": "Fix the profile setup flow so that when a new user submits their profile (name, email, department), the data is correctly saved to the backend and an approval request is persisted and visible to admins in the Request Management Module.",
       "files": [
-        "frontend/src/components/ProfileSetup.tsx"
+        "frontend/src/components/ProfileSetup.tsx",
+        "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -26,10 +27,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-app-tsx-onboarding-flow-routing-so-that-after-a-profile-is-saved-via-profilesetup-the-bootstrap-state-is-re-fetched-and-the-user-is-correctly-transitioned-away-from-the-profile-setup-screen-ensure-the-condition-that-decides-whether-to-show-profilesetup-approvalpending-or-the-dashboard-is-evaluated-correctly-after-the-profile-save-mutation-completes",
-      "featureTitle": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen. Ensure the condition that decides whether to show ProfileSetup, ApprovalPending, or the Dashboard is evaluated correctly after the profile save mutation completes.",
+      "featureId": "feature-fix-the-user-management-module-so-that-all-registered-users-appear-in-the-admin-s-user-table-with-correct-profile-data-and-approve-reject-role-change-delete-actions-execute-successfully-without-errors",
+      "featureTitle": "Fix the User Management Module so that all registered users appear in the admin's user table with correct profile data, and approve/reject/role-change/delete actions execute successfully without errors.",
       "files": [
-        "frontend/src/App.tsx",
+        "frontend/src/components/modules/UserManagementModule.tsx",
         "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
@@ -47,6 +48,32 @@
       ],
       "testIds": [
         "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-the-approvalpending-screen-so-that-the-auto-polling-every-15-seconds-and-manual-refresh-correctly-detect-when-a-user-has-been-approved-and-redirect-the-user-to-the-dashboard-upon-approval",
+      "featureTitle": "Fix the ApprovalPending screen so that the auto-polling (every 15 seconds) and manual refresh correctly detect when a user has been approved, and redirect the user to the Dashboard upon approval.",
+      "files": [
+        "frontend/src/App.tsx",
+        "frontend/src/components/ApprovalPending.tsx",
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "qr-code@1.0.0",
+        "http-outcalls@3.0.0",
+        "user-approval@3.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
       ],
       "confidence": "high"
     }

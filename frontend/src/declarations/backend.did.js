@@ -64,6 +64,16 @@ export const BarcodeExportRequest = IDL.Record({
   'exportType' : BarcodeExportFormat,
   'productId' : IDL.Nat,
 });
+export const UserApprovalStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const ApprovalRequest = IDL.Record({
+  'status' : UserApprovalStatus,
+  'principal' : IDL.Principal,
+  'timestamp' : Time,
+});
 export const ApprovalStatus = IDL.Variant({
   'pending' : IDL.Null,
   'approved' : IDL.Null,
@@ -300,6 +310,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'exportProductBarcode' : IDL.Func([BarcodeExportRequest], [ExternalBlob], []),
+  'getAllApprovalRequests' : IDL.Func(
+      [],
+      [IDL.Vec(ApprovalRequest)],
+      ['query'],
+    ),
   'getApprovalRequests' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'getBootstrapState' : IDL.Func([], [AppBootstrapState], ['query']),
   'getBootstrapStatus' : IDL.Func([], [BootstrapStatus], ['query']),
@@ -447,6 +462,16 @@ export const idlFactory = ({ IDL }) => {
   const BarcodeExportRequest = IDL.Record({
     'exportType' : BarcodeExportFormat,
     'productId' : IDL.Nat,
+  });
+  const UserApprovalStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const ApprovalRequest = IDL.Record({
+    'status' : UserApprovalStatus,
+    'principal' : IDL.Principal,
+    'timestamp' : Time,
   });
   const ApprovalStatus = IDL.Variant({
     'pending' : IDL.Null,
@@ -687,6 +712,11 @@ export const idlFactory = ({ IDL }) => {
         [BarcodeExportRequest],
         [ExternalBlob],
         [],
+      ),
+    'getAllApprovalRequests' : IDL.Func(
+        [],
+        [IDL.Vec(ApprovalRequest)],
+        ['query'],
       ),
     'getApprovalRequests' : IDL.Func(
         [],

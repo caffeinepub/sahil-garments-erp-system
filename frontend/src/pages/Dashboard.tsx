@@ -17,8 +17,12 @@ const ReportsModule = lazy(() => import('../components/modules/ReportsModule'));
 const ProfitLossModule = lazy(() => import('../components/modules/ProfitLossModule'));
 const NotificationsModule = lazy(() => import('../components/modules/NotificationsModule'));
 const UserManagementModule = lazy(() => import('../components/modules/UserManagementModule'));
-const RequestManagementModule = lazy(() => import('../components/modules/RequestManagementModule'));
-const SecondaryAdminAllowlistModule = lazy(() => import('../components/modules/SecondaryAdminAllowlistModule'));
+const RequestManagementModule = lazy(
+  () => import('../components/modules/RequestManagementModule'),
+);
+const SecondaryAdminAllowlistModule = lazy(
+  () => import('../components/modules/SecondaryAdminAllowlistModule'),
+);
 const AnalyticsModule = lazy(() => import('../components/modules/AnalyticsModule'));
 
 interface DashboardProps {
@@ -36,11 +40,23 @@ function ModuleLoadingFallback() {
   );
 }
 
+function NoProfileFallback() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <p className="text-muted-foreground">User profile not available.</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ bootstrapData }: DashboardProps) {
   const [activeModule, setActiveModule] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isAdminRole = useIsAdminRole(bootstrapData);
-  const userProfile = bootstrapData.userProfile as UserProfile;
+
+  // useIsAdminRole is a plain helper — pass bootstrapData directly
+  const isAdminRole: boolean = useIsAdminRole(bootstrapData);
+  const userProfile = bootstrapData.userProfile as UserProfile | undefined;
   const userAppRole = userProfile?.appRole;
 
   const canAccessModule = (moduleId: string): boolean => {
@@ -76,31 +92,41 @@ export default function Dashboard({ bootstrapData }: DashboardProps) {
       return (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <p className="text-muted-foreground">You don't have permission to access this module.</p>
+            <p className="text-muted-foreground">
+              You don't have permission to access this module.
+            </p>
           </div>
         </div>
       );
     }
 
+    // Modules that require a UserProfile — guard with fallback
+    const withProfile = (render: (p: UserProfile) => React.ReactNode) => {
+      if (!userProfile) return <NoProfileFallback />;
+      return render(userProfile);
+    };
+
     switch (activeModule) {
       case 'dashboard':
-        return <DashboardHome userProfile={userProfile} />;
+        return withProfile((p) => <DashboardHome userProfile={p} />);
       case 'inventory':
-        return <InventoryModule userProfile={userProfile} />;
+        return withProfile((p) => <InventoryModule userProfile={p} />);
       case 'orders':
-        return <OrdersModule userProfile={userProfile} />;
+        return withProfile((p) => <OrdersModule userProfile={p} />);
       case 'customers':
-        return <CustomersModule userProfile={userProfile} />;
+        return withProfile((p) => <CustomersModule userProfile={p} />);
       case 'invoice':
-        return <InvoiceModule userProfile={userProfile} />;
+        return withProfile((p) => <InvoiceModule userProfile={p} />);
       case 'invoice-history':
-        return <InvoiceHistoryModule userProfile={userProfile} isAdmin={isAdminRole} />;
+        return withProfile((p) => (
+          <InvoiceHistoryModule userProfile={p} isAdmin={isAdminRole} />
+        ));
       case 'barcode':
-        return <BarcodeModule userProfile={userProfile} />;
+        return withProfile((p) => <BarcodeModule userProfile={p} />);
       case 'reports':
-        return <ReportsModule userProfile={userProfile} />;
+        return withProfile((p) => <ReportsModule userProfile={p} />);
       case 'profit-loss':
-        return <ProfitLossModule userProfile={userProfile} />;
+        return withProfile((p) => <ProfitLossModule userProfile={p} />);
       case 'notifications':
         return <NotificationsModule />;
       case 'user-management':
@@ -110,9 +136,9 @@ export default function Dashboard({ bootstrapData }: DashboardProps) {
       case 'secondary-admin':
         return <SecondaryAdminAllowlistModule bootstrapData={bootstrapData} />;
       case 'analytics':
-        return <AnalyticsModule userProfile={userProfile} />;
+        return withProfile((p) => <AnalyticsModule userProfile={p} />);
       default:
-        return <DashboardHome userProfile={userProfile} />;
+        return withProfile((p) => <DashboardHome userProfile={p} />);
     }
   };
 
@@ -125,12 +151,10 @@ export default function Dashboard({ bootstrapData }: DashboardProps) {
           onModuleChange={setActiveModule}
           bootstrapData={bootstrapData}
           isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(prev => !prev)}
+          onToggle={() => setSidebarOpen((prev) => !prev)}
         />
         <main className="flex-1 overflow-y-auto">
-          <Suspense fallback={<ModuleLoadingFallback />}>
-            {renderModule()}
-          </Suspense>
+          <Suspense fallback={<ModuleLoadingFallback />}>{renderModule()}</Suspense>
         </main>
       </div>
       <Footer />

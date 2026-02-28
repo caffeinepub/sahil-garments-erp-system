@@ -1,36 +1,52 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "App with profile completion/setup flow that is not working correctly",
+  "summary": "New project",
   "architectural_notes": [],
   "known_issues": [
-    "'Complete Your Profile' / complete setup flow is not working (user reported it is not completing)"
+    "User management and profile functionality is not working properly"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-investigate-and-fix-the-profilesetup-form-so-that-submitting-profile-information-name-email-department-role-successfully-saves-the-profile-and-advances-the-user-past-the-setup-screen-to-the-next-appropriate-state-approval-pending-or-dashboard",
-      "title": "Investigate and fix the ProfileSetup form so that submitting profile information (name, email, department, role) successfully saves the profile and advances the user past the setup screen to the next appropriate state (approval pending or dashboard).",
+      "id": "feature-fix-the-profile-setup-flow-so-that-when-a-new-user-submits-their-profile-name-email-department-the-data-is-correctly-saved-to-the-backend-and-an-approval-request-is-persisted-and-visible-to-admins-in-the-request-management-module",
+      "title": "Fix the profile setup flow so that when a new user submits their profile (name, email, department), the data is correctly saved to the backend and an approval request is persisted and visible to admins in the Request Management Module.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-the-app-tsx-onboarding-flow-routing-so-that-after-a-profile-is-saved-via-profilesetup-the-bootstrap-state-is-re-fetched-and-the-user-is-correctly-transitioned-away-from-the-profile-setup-screen-ensure-the-condition-that-decides-whether-to-show-profilesetup-approvalpending-or-the-dashboard-is-evaluated-correctly-after-the-profile-save-mutation-completes",
-      "title": "Fix the App.tsx onboarding flow routing so that after a profile is saved via ProfileSetup, the bootstrap state is re-fetched and the user is correctly transitioned away from the profile-setup screen. Ensure the condition that decides whether to show ProfileSetup, ApprovalPending, or the Dashboard is evaluated correctly after the profile save mutation completes.",
+      "id": "feature-fix-the-user-management-module-so-that-all-registered-users-appear-in-the-admin-s-user-table-with-correct-profile-data-and-approve-reject-role-change-delete-actions-execute-successfully-without-errors",
+      "title": "Fix the User Management Module so that all registered users appear in the admin's user table with correct profile data, and approve/reject/role-change/delete actions execute successfully without errors.",
       "reqIds": [
         "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-approvalpending-screen-so-that-the-auto-polling-every-15-seconds-and-manual-refresh-correctly-detect-when-a-user-has-been-approved-and-redirect-the-user-to-the-dashboard-upon-approval",
+      "title": "Fix the ApprovalPending screen so that the auto-polling (every 15 seconds) and manual refresh correctly detect when a user has been approved, and redirect the user to the Dashboard upon approval.",
+      "reqIds": [
+        "REQ-3"
       ],
       "version": 1
     }
   ],
   "new_feature_requests": [
     {
-      "id": "AR-3",
-      "summary": "Audit the backend saveProfile (or equivalent) endpoint in main.mo to ensure it correctly persists the user's profile data and returns a success response. Verify that the profile is associated with the caller's principal and that the stored profile is reflected in subsequent bootstrap/getProfile calls.",
+      "id": "AR-4",
+      "summary": "Fix the backend to ensure that approval requests are correctly stored in stable storage (approvalRequests map), survive canister upgrades, and are retrievable by admin query functions.",
       "reqIds": [
-        "REQ-3"
+        "REQ-4"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Ensure that after an admin approves or rejects a user, a notification is created for that user so they can see the outcome in the Notifications Module.",
+      "reqIds": [
+        "REQ-5"
       ],
       "status": "pending"
     }
