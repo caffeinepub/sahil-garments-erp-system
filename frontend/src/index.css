@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Sahil Garments Gold & Black Theme */
+    --background: oklch(98% 0.01 60);
+    --foreground: oklch(20% 0.02 60);
+    --card: oklch(100% 0 0);
+    --card-foreground: oklch(20% 0.02 60);
+    --popover: oklch(100% 0 0);
+    --popover-foreground: oklch(20% 0.02 60);
+    --primary: oklch(55% 0.20 260);
+    --primary-foreground: oklch(98% 0.01 260);
+    --secondary: oklch(92% 0.02 60);
+    --secondary-foreground: oklch(25% 0.02 60);
+    --muted: oklch(94% 0.01 60);
+    --muted-foreground: oklch(50% 0.02 60);
+    --accent: oklch(92% 0.02 260);
+    --accent-foreground: oklch(25% 0.02 260);
+    --destructive: oklch(55% 0.22 25);
+    --destructive-foreground: oklch(98% 0.01 25);
+    --border: oklch(88% 0.01 60);
+    --input: oklch(88% 0.01 60);
+    --ring: oklch(55% 0.20 260);
+    --radius: 0.5rem;
+    --chart-1: oklch(60% 0.20 260);
+    --chart-2: oklch(65% 0.18 220);
+    --chart-3: oklch(70% 0.16 280);
+    --chart-4: oklch(55% 0.22 240);
+    --chart-5: oklch(50% 0.24 300);
+    /* Gold accent for invoice documents */
+    --invoice-gold: oklch(65% 0.15 80);
+    --invoice-gold-dark: oklch(55% 0.15 80);
+  }
+
+  .dark {
+    --background: oklch(15% 0.02 60);
+    --foreground: oklch(95% 0.01 60);
+    --card: oklch(18% 0.02 60);
+    --card-foreground: oklch(95% 0.01 60);
+    --popover: oklch(18% 0.02 60);
+    --popover-foreground: oklch(95% 0.01 60);
+    --primary: oklch(65% 0.20 260);
+    --primary-foreground: oklch(15% 0.02 260);
+    --secondary: oklch(25% 0.02 60);
+    --secondary-foreground: oklch(95% 0.01 60);
+    --muted: oklch(25% 0.02 60);
+    --muted-foreground: oklch(65% 0.02 60);
+    --accent: oklch(30% 0.03 260);
+    --accent-foreground: oklch(95% 0.01 260);
+    --destructive: oklch(55% 0.22 25);
+    --destructive-foreground: oklch(98% 0.01 25);
+    --border: oklch(30% 0.02 60);
+    --input: oklch(30% 0.02 60);
+    --ring: oklch(65% 0.20 260);
+    --chart-1: oklch(65% 0.20 260);
+    --chart-2: oklch(70% 0.18 220);
+    --chart-3: oklch(75% 0.16 280);
+    --chart-4: oklch(60% 0.22 240);
+    --chart-5: oklch(55% 0.24 300);
+    --invoice-gold: oklch(70% 0.15 80);
+    --invoice-gold-dark: oklch(60% 0.15 80);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* GPU-optimized animations */
+@keyframes loading {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Apply GPU acceleration to animations */
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+  will-change: opacity, transform;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: opacity;
+}
+
+/* Optimize card transitions */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, box-shadow;
+}
+
+/* Smooth hover effects */
+.hover\:shadow-lg:hover {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.hover\:-translate-y-1:hover {
+  transform: translateY(-0.25rem);
+}
+
+/* Optimize scrolling */
+.overflow-y-auto {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  will-change: scroll-position;
+}

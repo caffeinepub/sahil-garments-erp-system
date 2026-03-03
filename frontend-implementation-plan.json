@@ -1,0 +1,83 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Fix User Management and Profile Functionality",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "summary": "Fix the profile setup flow to correctly save user data and create approval requests visible to admins",
+      "acceptanceCriteria": [
+        "A new user can submit the ProfileSetup form without errors.",
+        "The submitted profile data (name, email, department, default 'sales' role) is stored in the backend.",
+        "An approval request entry is created and persisted in the backend's approvalRequests map after profile submission.",
+        "The admin's Request Management Module shows the new user's pending approval request after they register."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/ProfileSetup.tsx",
+          "operation": "modify",
+          "description": "Fix the profile submission flow to ensure saveCallerUserProfile is called correctly with all required fields (name, email, department, appRole defaulting to 'sales'). Add proper error handling using the approvalErrors utility to parse and display backend errors. Ensure requestApproval is called after profile save succeeds, and handle the case where approval request creation might fail separately from profile save. Add loading states during submission and clear success/error messages appropriately."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review and fix the useSaveCallerUserProfile and useRequestApproval mutation hooks to ensure they properly propagate errors from the backend and invalidate the correct query keys after success. Ensure useSaveCallerUserProfile invalidates ['currentUserProfile', 'bootstrapState'] and useRequestApproval invalidates ['approvalRequests', 'bootstrapState']. Add error transformation using approvalErrors utility if not already present."
+        },
+        {
+          "path": "frontend/src/utils/approvalErrors.ts",
+          "operation": "modify",
+          "description": "Review and enhance error parsing logic to cover all possible profile submission and approval request errors from the backend. Ensure parseApprovalError correctly identifies profile save failures, approval request failures, duplicate requests, and validation errors. Add any missing error patterns based on backend error messages."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Fix User Management Module to correctly display all users and execute admin actions without errors",
+      "acceptanceCriteria": [
+        "The admin User Management Module fetches and displays all user profiles correctly.",
+        "Approve action updates the user's approval status in the backend and the table reflects the change.",
+        "Reject action updates the user's status and the table reflects the change.",
+        "Role assignment dropdown updates the user's role in the backend without errors.",
+        "Delete action removes the user from the backend and the table updates accordingly."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/modules/UserManagementModule.tsx",
+          "operation": "modify",
+          "description": "Fix the user list rendering to correctly fetch and display all user profiles with their approval status. Ensure the useListApprovals query is correctly integrated with user profile data to show complete information (name, email, department, role, approval status). Fix the approve action to call setApproval with status 'approved' and properly invalidate queries to refresh the table. Fix the reject action similarly with status 'rejected'. Ensure the role assignment dropdown calls assignAppRole correctly and invalidates the user list query. Fix the delete action to call permanentlyRemoveUserAccount and handle success/error cases with proper query invalidation. Add loading states and error handling for all mutations."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review and fix the useListApprovals, useSetApproval, useAssignAppRole, and usePermanentlyRemoveUserAccount hooks. Ensure useListApprovals fetches complete user information (possibly combining approval status with user profiles). Ensure all mutation hooks properly invalidate ['approvalRequests', 'userList', 'bootstrapState'] after successful execution. Add error handling and ensure mutations are only enabled when actor is available."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Fix ApprovalPending screen auto-polling and approval detection to correctly redirect users to Dashboard",
+      "acceptanceCriteria": [
+        "The ApprovalPending component polls the backend for approval status every 15 seconds without errors.",
+        "When an admin approves the user, the next poll (or manual refresh) detects the approved status.",
+        "The user is redirected from the ApprovalPending screen to the Dashboard after approval is detected."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/ApprovalPending.tsx",
+          "operation": "modify",
+          "description": "Fix the approval status polling mechanism to correctly use the useIsCallerApproved query with a 15-second refetch interval. Ensure the query is enabled and properly fetches approval status from the backend. Add a useEffect hook that watches the isApproved status and redirects to '/dashboard' (or triggers a bootstrap state refetch) when approval is detected. Fix the manual refresh button to trigger an immediate refetch of the approval status. Ensure polling continues even when the tab is backgrounded. Add proper error handling if the approval check fails, allowing users to retry."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review and fix the useIsCallerApproved query hook to ensure it correctly calls the backend isCallerApproved method and supports refetch intervals. Ensure the query key is unique and the hook properly returns the approval status. Add support for manual refetch via the refetch function. Ensure the query is not affected by global polling context if it needs to poll independently."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Review the routing logic that determines when to show ApprovalPending vs Dashboard. Ensure that when the bootstrap state indicates the user is approved (isApproved: true), the app navigates away from ApprovalPending to Dashboard. Consider adding a state refresh mechanism or navigation trigger when approval status changes during polling on the ApprovalPending screen."
+        }
+      ]
+    }
+  ]
+}

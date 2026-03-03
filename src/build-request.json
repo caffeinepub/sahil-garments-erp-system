@@ -1,0 +1,72 @@
+{
+  "kind": "build_request",
+  "title": "Fix app initialization failure",
+  "priority": "high",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Investigate and fix the application initialization failure that prevents the app from opening properly after Version 49 deployment. Check for runtime errors in App.tsx bootstrap flow, authentication state handling, and any breaking changes in the recent profile save fix.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "app proper open nahi ho raha hai"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Application loads successfully without blocking errors",
+        "User can access the login page or dashboard depending on authentication state",
+        "No console errors related to initialization or bootstrap flow",
+        "Authentication flow completes without hanging"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Add comprehensive error boundaries and loading state handling to catch and display any initialization failures gracefully, showing user-friendly error messages instead of blank screens.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Error boundary wraps main App component to catch render errors",
+        "Loading states display properly during bootstrap fetch",
+        "Network failures show clear error messages with retry options",
+        "Failed authentication attempts provide actionable feedback"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Verify backend actor initialization and canister availability to ensure the app can successfully connect to the backend services.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Backend canister responds to health checks",
+        "Actor methods are accessible from frontend",
+        "No CORS or network connectivity issues",
+        "Bootstrap data fetch returns expected structure"
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not modify authentication hooks in frontend/src/hooks/useInternetIdentity.ts or frontend/src/hooks/useActor.ts",
+    "Preserve existing ProfileSetup component logic from Version 49",
+    "Maintain backward compatibility with existing user data"
+  ],
+  "nonGoals": [
+    "Adding new features or modules",
+    "Redesigning the UI or user experience",
+    "Modifying role-based access control logic"
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

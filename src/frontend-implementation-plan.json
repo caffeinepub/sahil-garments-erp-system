@@ -1,0 +1,81 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Fix app initialization failure",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "summary": "Investigate and fix the application initialization failure that prevents the app from opening properly after Version 49 deployment",
+      "acceptanceCriteria": [
+        "Application loads successfully without blocking errors",
+        "User can access the login page or dashboard depending on authentication state",
+        "No console errors related to initialization or bootstrap flow",
+        "Authentication flow completes without hanging"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Fix initialization flow by: 1) Adding null safety checks for bootstrap state and user profile before rendering conditional components, 2) Ensuring proper error handling for failed bootstrap fetch, 3) Adding fallback states when data is partially loaded, 4) Verifying the conditional rendering logic for LoginPage, ProfileSetup, ApprovalPending, and Dashboard doesn't have race conditions, 5) Adding additional debug logging to trace where initialization fails, 6) Ensuring the component gracefully handles undefined or null values in bootstrap state"
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Fix bootstrap state query by: 1) Adding proper error handling and retry logic for getBootstrapState query, 2) Ensuring the query doesn't hang on network failures with appropriate timeout configuration, 3) Adding fallback values for when bootstrap state fetch fails, 4) Verifying enabled conditions don't create circular dependencies, 5) Adding detailed error logging to diagnose fetch failures"
+        },
+        {
+          "path": "frontend/src/components/ProfileSetup.tsx",
+          "operation": "modify",
+          "description": "Add error boundary protection and validation by: 1) Wrapping form submission in try-catch with user-friendly error messages, 2) Adding validation to ensure all required fields are populated before submission, 3) Handling edge cases where profile save succeeds but approval request fails, 4) Adding loading state to prevent double submissions, 5) Ensuring component doesn't crash on unexpected backend responses"
+        },
+        {
+          "path": "frontend/src/components/ApprovalPending.tsx",
+          "operation": "modify",
+          "description": "Fix polling and state handling by: 1) Adding error handling for failed status checks during polling, 2) Ensuring polling stops gracefully when component unmounts, 3) Adding null safety for user profile display, 4) Handling edge cases where approval status changes mid-poll, 5) Adding retry logic for transient network failures"
+        },
+        {
+          "path": "frontend/src/hooks/useActor.ts",
+          "operation": "modify",
+          "description": "Verify actor initialization by: 1) Adding additional error logging for actor creation failures, 2) Ensuring the hook properly handles cases where backend canister is unavailable, 3) Adding timeout handling for slow actor initialization, 4) Verifying the enabled condition doesn't cause initialization to skip, 5) Adding fallback behavior when actor cannot be created. Do not modify the core authentication logic per constraints."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Add comprehensive error boundaries and loading state handling to catch and display any initialization failures gracefully",
+      "acceptanceCriteria": [
+        "Error boundary wraps main App component to catch render errors",
+        "Loading states display properly during bootstrap fetch",
+        "Network failures show clear error messages with retry options",
+        "Failed authentication attempts provide actionable feedback"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/ErrorBoundary.tsx",
+          "operation": "create",
+          "description": "Create a React error boundary component that: 1) Catches rendering errors in child components, 2) Displays a user-friendly error screen with error details and a retry button, 3) Logs error information to console for debugging, 4) Provides a reset function to clear error state and retry, 5) Includes styling consistent with the application theme"
+        },
+        {
+          "path": "frontend/src/main.tsx",
+          "operation": "modify",
+          "description": "Wrap the App component with the new ErrorBoundary component to catch any initialization or rendering errors at the top level, ensuring users see a friendly error screen instead of a blank page when initialization fails"
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Enhance loading and error states by: 1) Adding a dedicated loading screen component when bootstrap state is being fetched, 2) Adding error display with retry button when bootstrap fetch fails, 3) Ensuring loading states properly reflect all async operations (actor initialization, bootstrap fetch, profile fetch), 4) Adding network error detection and user-friendly error messages, 5) Implementing a retry mechanism that clears React Query cache and re-fetches bootstrap state"
+        },
+        {
+          "path": "frontend/src/components/InitializationError.tsx",
+          "operation": "create",
+          "description": "Create a dedicated component for displaying initialization failures that: 1) Shows a clear error message explaining the initialization failure, 2) Provides a retry button that triggers a full re-initialization, 3) Includes a link to contact support if retries fail, 4) Displays technical error details in a collapsible section for debugging, 5) Uses Sahil Garments branding and theme colors"
+        },
+        {
+          "path": "frontend/src/pages/LoginPage.tsx",
+          "operation": "modify",
+          "description": "Add error handling for authentication failures by: 1) Wrapping login button click in try-catch, 2) Displaying user-friendly error messages when Internet Identity login fails, 3) Adding retry logic for transient authentication errors, 4) Showing loading state during login process, 5) Handling cases where authentication succeeds but subsequent profile fetch fails"
+        }
+      ]
+    }
+  ]
+}
