@@ -14,10 +14,9 @@ import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
 
-import Debug "mo:core/Debug";
+import Migration "migration";
 
-// Version 3.2.2. Add persistent default secondary admin emails. IMPORTANT: System-level secondary admin defaults should only be changed via code updates on system contract level.
-
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -303,6 +302,7 @@ actor {
   let userAccounts = Map.empty<Principal, UserAccount>();
   let inventoryLocations = Map.empty<Nat, InventoryLocation>();
   var adminPrincipals = Set.empty<Principal>();
+  var knownAdminPrincipals = Set.empty<Principal>();
   var previousRejectedUsers = Set.empty<Principal>();
   let userSignatures = Map.empty<Principal, Storage.ExternalBlob>();
   var secondaryAdminEmails = Set.fromArray([
@@ -334,6 +334,12 @@ actor {
 
   let approvalState = UserApproval.initState(accessControlState);
 
+  func updateKnownAdminCaller(caller : Principal) {
+    if (AccessControl.isAdmin(accessControlState, caller)) {
+      knownAdminPrincipals.add(caller);
+    };
+  };
+
   private func isSecondaryAdmin(caller : Principal) : Bool {
     secondaryAdminPrincipals.contains(caller);
   };
@@ -343,6 +349,7 @@ actor {
   };
 
   public shared ({ caller }) func addSecondaryAdminEmail(email : Text) : async () {
+    updateKnownAdminCaller(caller);
     if (not isPrimaryAdmin(caller)) {
       Runtime.trap("Unauthorized: Only primary/system admins can add secondary admin emails");
     };
@@ -350,6 +357,7 @@ actor {
   };
 
   public shared ({ caller }) func removeSecondaryAdminEmail(email : Text) : async () {
+    updateKnownAdminCaller(caller);
     if (not isPrimaryAdmin(caller)) {
       Runtime.trap("Unauthorized: Only primary/system admins can remove secondary admin emails");
     };
@@ -360,6 +368,7 @@ actor {
   };
 
   public shared query ({ caller }) func listSecondaryAdminEmails() : async [Text] {
+    updateKnownAdminCaller(caller);
     if (not isPrimaryAdmin(caller)) {
       Runtime.trap("Unauthorized: Only primary/system admins can view secondary admin emails");
     };
@@ -387,6 +396,7 @@ actor {
   };
 
   public shared query ({ caller }) func getBootstrapState() : async AppBootstrapState {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Authentication required");
     };
@@ -509,7 +519,33 @@ actor {
     AccessControl.hasPermission(accessControlState, caller, #admin) or UserApproval.isApproved(approvalState, caller);
   };
 
+  private func getAllAdminPrincipals() : [Principal] {
+    let uniqueAdmins = Set.empty<Principal>();
+    
+    // Add explicitly tracked admin principals
+    for (principal in adminPrincipals.values()) {
+      uniqueAdmins.add(principal);
+    };
+    
+    // Add known admin principals (those who have called functions)
+    for (principal in knownAdminPrincipals.values()) {
+      if (AccessControl.isAdmin(accessControlState, principal)) {
+        uniqueAdmins.add(principal);
+      };
+    };
+    
+    // Add all user accounts that have admin role
+    for ((principal, account) in userAccounts.entries()) {
+      if (AccessControl.isAdmin(accessControlState, principal)) {
+        uniqueAdmins.add(principal);
+      };
+    };
+    
+    uniqueAdmins.toArray();
+  };
+
   public shared ({ caller }) func requestApproval() : async () {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Authentication required");
     };
@@ -552,17 +588,25 @@ actor {
     approvalRequests.add(caller, approvalRequest);
 
     Debug.print("Backend: notifying all admins about approval request from " # userName);
-    for (adminPrincipal in adminPrincipals.values()) {
+
+    // Get all admin principals (including primary admin)
+    let allAdminPrincipals = getAllAdminPrincipals();
+    
+    // Notify all admins
+    for (principal in allAdminPrincipals.values()) {
       ignore createNotificationInternal(
-        adminPrincipal,
+        principal,
         "Approval Requested",
         "User " # userName # " has requested approval.",
       );
     };
+
+    Debug.print("Backend: approval request notifications sent to all admin principals");
     Debug.print("Backend: approval request lifecycle complete for " # caller.toText());
   };
 
   public shared query ({ caller }) func getApprovalRequests() : async [UserApproval.UserApprovalInfo] {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
     let allApprovals = UserApproval.listApprovals(approvalState);
     Debug.print("Backend: getApprovalRequests returning " # allApprovals.size().toText() # " total approval records");
@@ -570,11 +614,13 @@ actor {
   };
 
   public shared query ({ caller }) func getAllApprovalRequests() : async [ApprovalRequest] {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
     approvalRequests.values().toArray();
   };
 
   public shared ({ caller }) func approveUser(user : Principal) : async () {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
 
     switch (userProfiles.get(user)) {
@@ -641,6 +687,7 @@ actor {
   };
 
   public shared ({ caller }) func rejectUser(user : Principal) : async () {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
 
     switch (userProfiles.get(user)) {
@@ -708,6 +755,7 @@ actor {
   };
 
   public shared query ({ caller }) func listApprovals() : async [UserApproval.UserApprovalInfo] {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
     let allApprovals = UserApproval.listApprovals(approvalState);
     Debug.print("Backend: ListApprovals triggered from active admin portal. Returning all approval requests: " # allApprovals.size().toText());
@@ -731,6 +779,7 @@ actor {
   };
 
   public shared query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
     };
@@ -738,6 +787,7 @@ actor {
   };
 
   public shared query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Authentication required");
     };
@@ -749,6 +799,7 @@ actor {
   };
 
   public query ({ caller }) func getPendingUsers() : async [UserApproval.UserApprovalInfo] {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
     let allApprovals = UserApproval.listApprovals(approvalState);
     let filtered = allApprovals.filter(func(a) { a.status == #pending });
@@ -756,6 +807,7 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
@@ -765,18 +817,21 @@ actor {
 
     switch (existingProfile) {
       case (null) {
+        // First-time profile creation
         switch (profile.appRole) {
           case (#admin) {
+            // Only block admin role if email is NOT in secondaryAdminEmails
             if (not isSecondaryAdminByEmail) {
               Runtime.trap("Unauthorized: Cannot self-assign admin role during profile creation");
             };
           };
           case (#sales or #inventoryManager or #accountant) {
-            Runtime.trap("Unauthorized: Cannot self-assign privileged roles during profile creation. Please create profile first and request role assignment from an admin.");
+            // Allow these roles freely during initial profile creation
           };
         };
       };
       case (?existing) {
+        // Profile update - check if role is being changed
         if (existing.appRole != profile.appRole) {
           switch (profile.appRole) {
             case (#admin) {
@@ -822,6 +877,7 @@ actor {
   };
 
   public shared ({ caller }) func assignAppRole(user : Principal, role : AppRole) : async () {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
 
     switch (userProfiles.get(user)) {
@@ -869,11 +925,13 @@ actor {
   };
 
   public shared query ({ caller }) func isPreviouslyRejected(user : Principal) : async Bool {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
     previousRejectedUsers.contains(user);
   };
 
   public shared ({ caller }) func processPreviouslyRejectedUser(user : Principal) : async () {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
 
     if (previousRejectedUsers.contains(user)) {
@@ -882,6 +940,7 @@ actor {
   };
 
   public shared ({ caller }) func clearPreviousRejection(user : Principal) : async () {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
     if (previousRejectedUsers.contains(user)) {
       previousRejectedUsers.remove(user);
@@ -889,6 +948,7 @@ actor {
   };
 
   public shared ({ caller }) func setApproval(user : Principal, status : UserApproval.ApprovalStatus) : async () {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
     switch (status) {
       case (#approved) { await approveUser(user) };
@@ -911,6 +971,7 @@ actor {
     color : Text,
     barcode : Text,
   ) : async Nat {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can add products");
@@ -959,6 +1020,7 @@ actor {
     color : Text,
     barcode : Text,
   ) : async () {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can update products");
@@ -994,17 +1056,20 @@ actor {
   };
 
   public shared query ({ caller }) func getProduct(productId : Nat) : async ?Product {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     products.get(productId);
   };
 
   public shared query ({ caller }) func listProducts() : async [Product] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     let iter = products.values();
     iter.toArray();
   };
 
   public shared ({ caller }) func addProductImage(productId : Nat, blob : Storage.ExternalBlob) : async () {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can add images");
@@ -1021,6 +1086,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteAllInventory() : async () {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can delete all inventory");
     };
@@ -1031,6 +1097,7 @@ actor {
   };
 
   public shared ({ caller }) func setProductLocation(productId : Nat, location : InventoryLocation) : async () {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can set inventory location");
@@ -1040,6 +1107,7 @@ actor {
   };
 
   public shared query ({ caller }) func getProductLocation(productId : Nat) : async ?InventoryLocation {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can view inventory location");
@@ -1049,6 +1117,7 @@ actor {
   };
 
   public shared ({ caller }) func createCustomer(name : Text, email : Text, phone : Text, address : Text) : async Nat {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can create customers");
@@ -1072,6 +1141,7 @@ actor {
   };
 
   public shared query ({ caller }) func getCustomer(_customerId : Nat) : async ?Customer {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can view customers");
@@ -1080,6 +1150,7 @@ actor {
   };
 
   public shared query ({ caller }) func listCustomers() : async [Customer] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can view customers");
@@ -1089,6 +1160,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteCustomer(customerId : Nat) : async Bool {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can delete customers");
@@ -1113,6 +1185,7 @@ actor {
   };
 
   public shared ({ caller }) func addInventoryEntry(productId : Nat, quantity : Nat, batch : Text, supplierId : Nat) : async Nat {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can add inventory");
@@ -1136,6 +1209,7 @@ actor {
   };
 
   public shared query ({ caller }) func getInventoryEntry(inventoryId : Nat) : async ?InventoryRecord {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can view inventory");
@@ -1144,6 +1218,7 @@ actor {
   };
 
   public shared query ({ caller }) func listInventory() : async [InventoryRecord] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can view inventory");
@@ -1153,6 +1228,7 @@ actor {
   };
 
   public shared ({ caller }) func createOrder(customerId : Nat, productId : Nat, quantity : Nat, status : Text, totalPrice : Nat) : async Nat {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can create orders");
@@ -1177,6 +1253,7 @@ actor {
   };
 
   public shared query ({ caller }) func getOrder(orderId : Nat) : async ?OrderRecord {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can view orders");
@@ -1185,6 +1262,7 @@ actor {
   };
 
   public shared query ({ caller }) func listOrders() : async [OrderRecord] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can view orders");
@@ -1194,6 +1272,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteAllOrders() : async () {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can delete all orders");
     };
@@ -1201,6 +1280,7 @@ actor {
   };
 
   public shared ({ caller }) func createInvoice(customerId : Nat, productId : Nat, quantity : Nat, price : Nat, tax : Nat, total : Nat, status : InvoiceStatus.T) : async Nat {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can create invoices");
@@ -1236,6 +1316,7 @@ actor {
   };
 
   public shared ({ caller }) func stockAdjustInvoice(invoiceId : Nat) : async () {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can adjust stock for invoices");
@@ -1275,6 +1356,7 @@ actor {
   };
 
   public shared query ({ caller }) func getInvoice(invoiceId : Nat) : async ?Invoice {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can view invoices");
@@ -1283,6 +1365,7 @@ actor {
   };
 
   public shared ({ caller }) func clearAllInvoices() : async () {
+    updateKnownAdminCaller(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can clear all invoices");
     };
@@ -1292,6 +1375,7 @@ actor {
   };
 
   public shared query ({ caller }) func listInvoices() : async [Invoice] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can view invoices");
@@ -1305,6 +1389,7 @@ actor {
     imageUrl : ?Text,
     pdfUrl : ?Text,
   ) : async Bool {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Sales staff and Admins can update invoice documents");
@@ -1326,6 +1411,7 @@ actor {
   };
 
   public query ({ caller }) func getInvoiceHistory(filter : ?InvoiceFilter, sortBy : ?Text, sortOrder : ?Text) : async [Invoice] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Admins and Sales roles can access invoice history");
@@ -1345,6 +1431,7 @@ actor {
   };
 
   public shared ({ caller }) func exportInvoiceHistory(_ : InvoiceExportFormat, _ : ?InvoiceFilter, _ : ?Text, _ : ?Text) : async Storage.ExternalBlob {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessSales(caller)) {
       Runtime.trap("Unauthorized: Only Admins and Sales roles can export invoice history");
@@ -1433,16 +1520,19 @@ actor {
   };
 
   public shared ({ caller }) func uploadUserSignature(signatureBlob : Storage.ExternalBlob) : async () {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     userSignatures.add(caller, signatureBlob);
   };
 
   public shared query ({ caller }) func getUserSignature() : async ?Storage.ExternalBlob {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     userSignatures.get(caller);
   };
 
   public shared query ({ caller }) func getSignatureForUser(user : Principal) : async ?Storage.ExternalBlob {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can view other users' signatures");
@@ -1453,6 +1543,7 @@ actor {
   // Notifications are accessible to any authenticated user (including pending/unapproved users)
   // so that users waiting for approval can poll and see the outcome notification.
   public shared query ({ caller }) func listNotifications() : async [Notification] {
+    updateKnownAdminCaller(caller);
     // Allow any authenticated (non-guest) user, including those pending approval,
     // so the ApprovalPending screen can retrieve approval outcome notifications.
     requireAuthenticatedUser(caller);
@@ -1467,6 +1558,7 @@ actor {
   };
 
   public shared ({ caller }) func markNotificationAsRead(notificationId : Nat) : async Bool {
+    updateKnownAdminCaller(caller);
     // Allow any authenticated (non-guest) user, including those pending approval,
     // so pending users can mark their approval outcome notifications as read.
     requireAuthenticatedUser(caller);
@@ -1488,6 +1580,7 @@ actor {
   };
 
   public shared ({ caller }) func createNotification(targetUser : Principal, title : Text, message : Text) : async Nat {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can create notifications");
@@ -1497,6 +1590,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteNotification(notificationId : Nat) : async Bool {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
 
     switch (notifications.get(notificationId)) {
@@ -1513,6 +1607,7 @@ actor {
   };
 
   public shared ({ caller }) func exportProductBarcode(_ : BarcodeExportRequest) : async Storage.ExternalBlob {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can export barcodes");
@@ -1522,6 +1617,7 @@ actor {
   };
 
   public shared ({ caller }) func batchExportBarcodes(_ : BarcodeBatchExportRequest) : async Storage.ExternalBlob {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can batch export barcodes");
@@ -1531,6 +1627,7 @@ actor {
   };
 
   public shared query ({ caller }) func getInventoryReportBarcodes() : async [Text] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not canAccessInventory(caller)) {
       Runtime.trap("Unauthorized: Only Inventory Managers and Admins can access inventory report barcodes");
@@ -1541,6 +1638,7 @@ actor {
   };
 
   public shared query ({ caller }) func getStats() : async Stats {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not (AccessControl.isAdmin(accessControlState, caller) or canAccessFinancial(caller))) {
       Runtime.trap("Unauthorized: Only Admins and Accountants can view statistics");
@@ -1569,6 +1667,7 @@ actor {
     amount : Nat,
     quantity : Nat,
   ) : async Nat {
+    updateKnownAdminCaller(caller);
     requireApprovedUser(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can create data entries");
@@ -1593,6 +1692,7 @@ actor {
   };
 
   public shared query ({ caller }) func getDataEntry(dataEntryId : Nat) : async ?DataEntry {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can view data entries");
@@ -1601,6 +1701,7 @@ actor {
   };
 
   public shared query ({ caller }) func listDataEntries() : async [DataEntry] {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can view data entries");
@@ -1610,6 +1711,7 @@ actor {
   };
 
   public shared query ({ caller }) func getProfitLossReport(startDate : Time.Time, endDate : Time.Time) : async ProfitLossReport {
+    updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
     if (not (AccessControl.isAdmin(accessControlState, caller) or canAccessFinancial(caller))) {
       Runtime.trap("Unauthorized: Only Admins and Accountants can access Profit & Loss Reports");
@@ -1663,6 +1765,7 @@ actor {
   };
 
   public shared ({ caller }) func permanentlyRemoveUserAccount(targetUser : Principal) : async () {
+    updateKnownAdminCaller(caller);
     requirePrimaryAdmin(caller);
 
     if (caller == targetUser) {

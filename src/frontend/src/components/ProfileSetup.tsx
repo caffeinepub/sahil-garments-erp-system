@@ -48,10 +48,13 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
     const msg = err instanceof Error ? err.message : String(err);
 
     if (
-      msg.includes("Cannot self-assign privileged roles") ||
-      msg.includes("Cannot self-assign admin role")
+      msg.includes("Cannot self-assign admin role") ||
+      msg.includes("admin role during profile creation")
     ) {
-      return "Profile creation failed: role assignment error. Please contact the administrator.";
+      return "Admin role can only be assigned if your email is pre-registered as an admin. Please select a different role (Sales, Inventory Manager, or Accountant) and request access.";
+    }
+    if (msg.includes("Cannot self-assign privileged roles")) {
+      return "Please select a role and save your profile. An administrator will assign your final role.";
     }
     if (msg.includes("Profile setup required")) {
       return "Please complete your profile before requesting approval.";
@@ -62,8 +65,11 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
     if (msg.includes("already been rejected")) {
       return "Your account has been rejected. Please contact an administrator.";
     }
-    if (msg.includes("Unauthorized")) {
+    if (msg.includes("Unauthorized: Only users can save profiles")) {
       return "Authentication error. Please log out and log in again.";
+    }
+    if (msg.includes("Unauthorized")) {
+      return `Permission error: ${msg.replace("Unauthorized:", "").trim()}`;
     }
     if (msg.includes("network") || msg.includes("fetch")) {
       return "Network error. Please check your connection and try again.";
@@ -238,13 +244,24 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
                     <SelectItem value={AppRole.admin}>Admin</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex items-start gap-1.5 mt-1">
-                  <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                  <p className="text-xs text-muted-foreground">
-                    Select Admin role if you are an administrator. Admin
-                    accounts require approval from the primary admin.
-                  </p>
-                </div>
+                {selectedRole === AppRole.admin ? (
+                  <div className="flex items-start gap-1.5 mt-1 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      Admin role only works if your email is pre-registered as
+                      an admin (e.g. sahilgarments16@gmail.com). Otherwise
+                      select Sales, Inventory Manager, or Accountant.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-1.5 mt-1">
+                    <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      Select your role. After approval, the admin can update
+                      your role if needed.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 space-y-3">
