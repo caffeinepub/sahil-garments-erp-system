@@ -41,6 +41,7 @@ import { useState } from "react";
 import type { AppBootstrapState } from "../../backend";
 import {
   useAddSecondaryAdminEmail,
+  useIsSuperAdmin,
   useListSecondaryAdminEmails,
   useRemoveSecondaryAdminEmail,
 } from "../../hooks/useQueries";
@@ -49,13 +50,14 @@ interface SecondaryAdminAllowlistModuleProps {
   bootstrapData: AppBootstrapState;
 }
 
-export default function SecondaryAdminAllowlistModule({
-  bootstrapData,
-}: SecondaryAdminAllowlistModuleProps) {
+export default function SecondaryAdminAllowlistModule(
+  _props: SecondaryAdminAllowlistModuleProps,
+) {
   const [newEmail, setNewEmail] = useState("");
   const [emailError, setEmailError] = useState("");
 
-  const isPrimaryAdmin = bootstrapData.isAdmin;
+  const { data: isPrimaryAdmin, isLoading: superAdminLoading } =
+    useIsSuperAdmin();
 
   const {
     data: emails = [],
@@ -64,6 +66,14 @@ export default function SecondaryAdminAllowlistModule({
   } = useListSecondaryAdminEmails();
   const addEmailMutation = useAddSecondaryAdminEmail();
   const removeEmailMutation = useRemoveSecondaryAdminEmail();
+
+  if (superAdminLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!isPrimaryAdmin) {
     return (

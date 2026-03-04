@@ -1,38 +1,25 @@
 # Sahil Garments ERP
 
 ## Current State
-
-- User Management module exists with approve/reject/role-change/delete actions.
-- ProfileSetup component saves profile with hardcoded `AppRole.sales` role; user cannot choose their role.
-- `useAllUserProfiles` calls `listApprovals()` which returns only users who have gone through the approval workflow; users who saved a profile but never called `requestApproval` may be missing.
-- The User Management table shows all approval-tracked users but can appear empty if no requests exist.
-- Admin sees a table of users with Approve/Reject/Role/Delete actions — but only Primary Admin can approve/reject.
-- Profile request flow: save profile → requestApproval → admin approves → user gets dashboard.
+Full-stack ERP with inventory, orders, invoices, customers, user approval, reports, and barcode modules. Two admin tiers: primary admin and secondary admin. Secondary admin allowlist is managed via the backend. The `Admin Allowlist` module in the frontend currently shows to any admin (including secondary admins) and uses `bootstrapData.isAdmin` to gate access — which is incorrect since secondary admins also have `isAdmin = true`.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Role selection dropdown in ProfileSetup (user-safe roles only: Sales, Inventory Manager, Accountant). Admin role is NOT selectable — it is only auto-assigned for secondary admin emails.
-- "Pending Requests" tab / section in User Management that shows users with pending approval status prominently at the top.
-- A request count badge on the User Management section showing how many pending requests exist.
-- Auto-refresh for the user list in User Management (every 15 seconds) so new requests appear without manual refresh.
-- "Request Sent" confirmation message on ApprovalPending screen so users know their request was submitted.
+- `pawankumarindia0091@gmail.com` to the default `secondaryAdminEmails` set in the backend (alongside existing `sahilgarments16@gmail.com`).
 
 ### Modify
-- ProfileSetup: add role selector (Sales / Inventory Manager / Accountant only); save selected role in profile; keep email-based admin auto-assignment as before.
-- UserManagementModule: split view into "Pending Requests" section (top, highlighted) and "All Users" table below; add auto-refresh polling.
-- useAllUserProfiles hook: also fetch `getAllApprovalRequests()` to catch users who may not be in `listApprovals()` yet, merge and deduplicate by principal.
+- Backend: Add `pawankumarindia0091@gmail.com` to the default secondary admin emails set.
+- Frontend `SecondaryAdminAllowlistModule`: Replace `bootstrapData.isAdmin` check with the `useIsSuperAdmin()` hook so only true primary admins can access the module.
+- Frontend `Sidebar`: Add `superAdminOnly` flag to the `Admin Allowlist` menu item and use `useIsSuperAdmin()` to filter it — hiding it from secondary admins.
+- Frontend `Dashboard.canAccessModule`: Restrict the `secondary-admin` module case to `isSuperAdmin === true` instead of `isAdminRole`.
 
 ### Remove
 - Nothing removed.
 
 ## Implementation Plan
-
-1. Update `ProfileSetup.tsx`: Add a role dropdown (Sales/Inventory Manager/Accountant). Save chosen role in profile. Keep admin auto-assignment logic for secondary admin emails unchanged.
-2. Update `UserManagementModule.tsx`:
-   - Add a "Pending Requests" highlighted section at the top showing only users with `status === 'pending'`.
-   - Add auto-refresh polling (refetchInterval: 15000) to `useAllUserProfiles`.
-   - Show pending count badge in the header.
-   - Existing "All Users" table stays below.
-3. Update `useAllUserProfiles` hook to merge results from both `listApprovals()` and `getAllApprovalRequests()` (deduped), so no user is missed even if they didn't go through the approval state machine.
-4. Add refetchInterval to the `useAllUserProfiles` query (15 seconds).
+1. Update `secondaryAdminEmails` default set in `main.mo` to include `pawankumarindia0091@gmail.com`.
+2. Update `SecondaryAdminAllowlistModule` to use `useIsSuperAdmin()` hook (already done in frontend).
+3. Update `Sidebar` with `superAdminOnly` flag and `isSuperAdmin` check (already done in frontend).
+4. Update `Dashboard.canAccessModule` to use `isSuperAdmin` for the `secondary-admin` case (already done in frontend).
+5. Deploy.

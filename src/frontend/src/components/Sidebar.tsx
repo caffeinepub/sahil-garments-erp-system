@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { type AppBootstrapState, AppRole } from "../backend";
-import { useIsAdminRole } from "../hooks/useQueries";
+import { useIsAdminRole, useIsSuperAdmin } from "../hooks/useQueries";
 
 interface SidebarProps {
   activeModule: string;
@@ -30,6 +30,7 @@ interface MenuItem {
   label: string;
   icon: React.ReactNode;
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
   roles?: AppRole[];
 }
 
@@ -100,7 +101,7 @@ const menuItems: MenuItem[] = [
     id: "secondary-admin",
     label: "Admin Allowlist",
     icon: <Shield size={18} />,
-    adminOnly: true,
+    superAdminOnly: true,
   },
 ];
 
@@ -113,9 +114,11 @@ export default function Sidebar({
 }: SidebarProps) {
   // useIsAdminRole is a plain helper — coerce null to undefined
   const isAdminRole: boolean = useIsAdminRole(bootstrapData ?? undefined);
+  const { data: isSuperAdmin = false } = useIsSuperAdmin();
   const userAppRole = bootstrapData?.userProfile?.appRole;
 
   const isMenuItemVisible = (item: MenuItem): boolean => {
+    if (item.superAdminOnly) return isSuperAdmin === true;
     if (isAdminRole) return true;
     if (item.adminOnly) return false;
     if (!item.roles || item.roles.length === 0) return true;

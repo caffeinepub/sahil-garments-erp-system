@@ -4,7 +4,7 @@ import { type AppBootstrapState, AppRole, type UserProfile } from "../backend";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
-import { useIsAdminRole } from "../hooks/useQueries";
+import { useIsAdminRole, useIsSuperAdmin } from "../hooks/useQueries";
 
 // Lazy load modules
 const DashboardHome = lazy(() => import("../components/modules/DashboardHome"));
@@ -71,6 +71,7 @@ export default function Dashboard({ bootstrapData }: DashboardProps) {
 
   // useIsAdminRole is a plain helper — pass bootstrapData directly
   const isAdminRole: boolean = useIsAdminRole(bootstrapData);
+  const { data: isSuperAdmin = false } = useIsSuperAdmin();
   const userProfile = bootstrapData.userProfile as UserProfile | undefined;
   const userAppRole = userProfile?.appRole;
 
@@ -95,8 +96,9 @@ export default function Dashboard({ bootstrapData }: DashboardProps) {
         return userAppRole === AppRole.accountant;
       case "user-management":
       case "request-management":
-      case "secondary-admin":
         return isAdminRole;
+      case "secondary-admin":
+        return isSuperAdmin === true;
       default:
         return false;
     }

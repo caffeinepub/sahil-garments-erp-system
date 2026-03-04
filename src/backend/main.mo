@@ -13,12 +13,11 @@ import AccessControl "authorization/access-control";
 import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
-
+import Migration "migration";
 import Debug "mo:core/Debug";
 
-// Version 3.2.1. Persistent default secondary admin emails. Apply data migration via the with-clause.
-
-
+// Version 3.2.2. Add persistent default secondary admin emails. IMPORTANT: System-level secondary admin defaults should only be changed via code updates on system contract level.
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -306,7 +305,10 @@ actor {
   var adminPrincipals = Set.empty<Principal>();
   var previousRejectedUsers = Set.empty<Principal>();
   let userSignatures = Map.empty<Principal, Storage.ExternalBlob>();
-  var secondaryAdminEmails = Set.fromArray(["sahilgarments16@gmail.com"]);
+  var secondaryAdminEmails = Set.fromArray([
+    "sahilgarments16@gmail.com",
+    "pawankumarindia0091@gmail.com",
+  ]);
   var secondaryAdminPrincipals = Set.empty<Principal>();
   let userEmailToPrincipal = Map.empty<Text, Principal>();
   let approvalRequests = Map.empty<Principal, ApprovalRequest>();
