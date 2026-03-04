@@ -13,11 +13,11 @@ import AccessControl "authorization/access-control";
 import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
-import Migration "migration";
+
 import Debug "mo:core/Debug";
 
 // Version 3.2.2. Add persistent default secondary admin emails. IMPORTANT: System-level secondary admin defaults should only be changed via code updates on system contract level.
-(with migration = Migration.run)
+
 actor {
   include MixinStorage();
 

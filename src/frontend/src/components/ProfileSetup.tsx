@@ -235,13 +235,14 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
                     <SelectItem value={AppRole.accountant}>
                       Accountant
                     </SelectItem>
+                    <SelectItem value={AppRole.admin}>Admin</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="flex items-start gap-1.5 mt-1">
                   <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
                   <p className="text-xs text-muted-foreground">
-                    Admin access is granted automatically if your email is
-                    pre-registered.
+                    Select Admin role if you are an administrator. Admin
+                    accounts require approval from the primary admin.
                   </p>
                 </div>
               </div>
