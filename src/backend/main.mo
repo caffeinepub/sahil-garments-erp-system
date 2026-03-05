@@ -14,9 +14,9 @@ import UserApproval "user-approval/approval";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
 
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   include MixinStorage();
 
@@ -521,26 +521,16 @@ actor {
 
   private func getAllAdminPrincipals() : [Principal] {
     let uniqueAdmins = Set.empty<Principal>();
-    
-    // Add explicitly tracked admin principals
+    // Scan AccessControl userRoles map directly - captures ALL admins regardless of session history
+    for ((principal, role) in accessControlState.userRoles.entries()) {
+      if (role == #admin) {
+        uniqueAdmins.add(principal);
+      };
+    };
+    // Also add secondary admin principals tracked separately
     for (principal in adminPrincipals.values()) {
       uniqueAdmins.add(principal);
     };
-    
-    // Add known admin principals (those who have called functions)
-    for (principal in knownAdminPrincipals.values()) {
-      if (AccessControl.isAdmin(accessControlState, principal)) {
-        uniqueAdmins.add(principal);
-      };
-    };
-    
-    // Add all user accounts that have admin role
-    for ((principal, account) in userAccounts.entries()) {
-      if (AccessControl.isAdmin(accessControlState, principal)) {
-        uniqueAdmins.add(principal);
-      };
-    };
-    
     uniqueAdmins.toArray();
   };
 
@@ -1058,6 +1048,9 @@ actor {
   public shared query ({ caller }) func getProduct(productId : Nat) : async ?Product {
     updateKnownAdminCaller(caller);
     requireApprovedUserQuery(caller);
+    if (not canAccessInventory(caller)) {
+      Runtime.trap("Unauthorized: Only Inventory Managers and Admins can view products");
+    };
     products.get(productId);
   };
 

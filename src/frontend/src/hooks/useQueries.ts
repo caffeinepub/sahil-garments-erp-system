@@ -760,46 +760,55 @@ export function useAllUserProfiles() {
     queryFn: async () => {
       if (!actor) return [];
 
-      // Fetch listApprovals (always available)
-      const approvals = await actor.listApprovals();
+      // Fetch both sources in parallel — never short-circuit on one being empty
+      const [approvalsResult, allRequestsResult] = await Promise.allSettled([
+        actor.listApprovals(),
+        actor.getAllApprovalRequests(),
+      ]);
 
-      // Also try getAllApprovalRequests — may fail if caller is not admin
-      let allRequests: ApprovalRequest[] = [];
-      try {
-        allRequests = await actor.getAllApprovalRequests();
-      } catch {
-        // Not an admin or method unavailable — skip silently
+      const approvalsData: UserApprovalInfo[] =
+        approvalsResult.status === "fulfilled" ? approvalsResult.value : [];
+      const requestsData: ApprovalRequest[] =
+        allRequestsResult.status === "fulfilled" ? allRequestsResult.value : [];
+
+      // Build merged map — use principal string as key
+      const mergedMap = new Map<string, UserApprovalInfo>();
+
+      // First, seed from listApprovals
+      for (const a of approvalsData) {
+        mergedMap.set(a.principal.toString(), a);
       }
 
-      if (allRequests.length === 0) return approvals;
-
-      // Build a map from existing approvals by principal string for deduplication
-      const approvalMap = new Map<string, UserApprovalInfo>(
-        approvals.map((a) => [a.principal.toString(), a]),
-      );
-
-      // Add entries from allRequests that are NOT already in approvalMap
-      for (const req of allRequests) {
+      // Then overlay/add from getAllApprovalRequests — this is the authoritative
+      // persistent source (always updated on requestApproval())
+      for (const req of requestsData) {
         const key = req.principal.toString();
-        if (!approvalMap.has(key)) {
-          // Map UserApprovalStatus → ApprovalStatus string
-          const status =
-            req.status === "approved"
-              ? ("approved" as const)
-              : req.status === "rejected"
-                ? ("rejected" as const)
-                : ("pending" as const);
-          approvalMap.set(key, { status, principal: req.principal });
+        const status =
+          req.status === "approved"
+            ? ("approved" as const)
+            : req.status === "rejected"
+              ? ("rejected" as const)
+              : ("pending" as const);
+
+        if (!mergedMap.has(key)) {
+          // New entry not yet in listApprovals — add it
+          mergedMap.set(key, { status, principal: req.principal });
+        } else {
+          // Update status if the persistent map shows a different (more recent) value
+          const existing = mergedMap.get(key)!;
+          if (existing.status !== status) {
+            mergedMap.set(key, { status, principal: req.principal });
+          }
         }
       }
 
-      return Array.from(approvalMap.values());
+      return Array.from(mergedMap.values());
     },
     enabled: !!actor && !actorFetching,
-    staleTime: 15_000,
+    staleTime: 10_000,
     gcTime: 5 * 60_000,
     retry: 1,
-    refetchInterval: 15_000,
+    refetchInterval: 10_000,
     refetchIntervalInBackground: false,
   });
 }

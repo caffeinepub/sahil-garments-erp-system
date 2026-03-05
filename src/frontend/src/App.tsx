@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import React, { useState, useEffect } from "react";
-import ApprovalPending from "./components/ApprovalPending";
+import React from "react";
+
 import LoadingWorkspace from "./components/LoadingWorkspace";
 import ProfileSetup from "./components/ProfileSetup";
 import { PollingProvider } from "./context/PollingContext";
@@ -21,20 +21,6 @@ export default function App() {
     isFetched: bootstrapFetched,
     error: bootstrapError,
   } = useGetBootstrapState();
-
-  const [approvedAndReady, setApprovedAndReady] = useState(false);
-
-  // When bootstrap data arrives and user is approved, mark ready
-  useEffect(() => {
-    if (bootstrapData?.isApproved) {
-      setApprovedAndReady(true);
-    }
-  }, [bootstrapData?.isApproved]);
-
-  const handleApproved = () => {
-    setApprovedAndReady(true);
-    queryClient.invalidateQueries({ queryKey: ["bootstrapState"] });
-  };
 
   // 1. Still initializing identity from storage
   if (isInitializing) {
@@ -96,22 +82,7 @@ export default function App() {
     );
   }
 
-  // 6. Profile exists but not approved
-  if (
-    bootstrapFetched &&
-    bootstrapData?.userProfile &&
-    !bootstrapData?.isApproved &&
-    !approvedAndReady
-  ) {
-    return (
-      <>
-        <ApprovalPending onApproved={handleApproved} />
-        <Toaster />
-      </>
-    );
-  }
-
-  // 7. Fully authenticated, approved, profile ready — show dashboard
+  // 6. Fully authenticated, profile ready — show dashboard (no approval gate)
   if (bootstrapData) {
     return (
       <PollingProvider>

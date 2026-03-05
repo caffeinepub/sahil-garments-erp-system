@@ -27,12 +27,6 @@ const ProfitLossModule = lazy(
 const NotificationsModule = lazy(
   () => import("../components/modules/NotificationsModule"),
 );
-const UserManagementModule = lazy(
-  () => import("../components/modules/UserManagementModule"),
-);
-const RequestManagementModule = lazy(
-  () => import("../components/modules/RequestManagementModule"),
-);
 const SecondaryAdminAllowlistModule = lazy(
   () => import("../components/modules/SecondaryAdminAllowlistModule"),
 );
@@ -94,9 +88,6 @@ export default function Dashboard({ bootstrapData }: DashboardProps) {
       case "profit-loss":
       case "analytics":
         return userAppRole === AppRole.accountant;
-      case "user-management":
-      case "request-management":
-        return isAdminRole;
       case "secondary-admin":
         return isSuperAdmin === true;
       default:
@@ -146,10 +137,6 @@ export default function Dashboard({ bootstrapData }: DashboardProps) {
         return withProfile((p) => <ProfitLossModule userProfile={p} />);
       case "notifications":
         return <NotificationsModule />;
-      case "user-management":
-        return <UserManagementModule bootstrapData={bootstrapData} />;
-      case "request-management":
-        return <RequestManagementModule bootstrapData={bootstrapData} />;
       case "secondary-admin":
         return <SecondaryAdminAllowlistModule bootstrapData={bootstrapData} />;
       case "analytics":

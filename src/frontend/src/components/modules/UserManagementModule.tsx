@@ -468,7 +468,7 @@ export default function UserManagementModule({
             data-ocid="users.loading_state"
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Auto-refreshing every 15s</span>
+            <span>Auto-refreshing every 10s</span>
           </div>
           <Button
             variant="outline"

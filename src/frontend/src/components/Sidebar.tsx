@@ -10,7 +10,6 @@ import {
   Shield,
   ShoppingCart,
   TrendingUp,
-  UserCheck,
   Users,
 } from "lucide-react";
 import type React from "react";
@@ -85,18 +84,6 @@ const menuItems: MenuItem[] = [
     adminOnly: true,
   },
   { id: "notifications", label: "Notifications", icon: <Bell size={18} /> },
-  {
-    id: "user-management",
-    label: "User Management",
-    icon: <UserCheck size={18} />,
-    adminOnly: true,
-  },
-  {
-    id: "request-management",
-    label: "Request Management",
-    icon: <Shield size={18} />,
-    adminOnly: true,
-  },
   {
     id: "secondary-admin",
     label: "Admin Allowlist",
