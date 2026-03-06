@@ -18,10 +18,11 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle, CheckCircle, Info, Loader2, User } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppRole } from "../backend";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  useGetCallerUserProfile,
   useRequestApproval,
   useSaveCallerUserProfile,
 } from "../hooks/useQueries";
@@ -39,8 +40,20 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const { data: existingProfile } = useGetCallerUserProfile();
   const saveProfile = useSaveCallerUserProfile();
   const requestApproval = useRequestApproval();
+
+  // When an existing profile loads, initialize the role selector from it
+  // so we never send a different role and trigger the backend permission error.
+  useEffect(() => {
+    if (existingProfile) {
+      if (existingProfile.name) setName(existingProfile.name);
+      if (existingProfile.email) setEmail(existingProfile.email);
+      if (existingProfile.department) setDepartment(existingProfile.department);
+      if (existingProfile.appRole) setSelectedRole(existingProfile.appRole);
+    }
+  }, [existingProfile]);
 
   const isSubmitting = saveProfile.isPending || requestApproval.isPending;
 
@@ -64,6 +77,9 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
     }
     if (msg.includes("already been rejected")) {
       return "Your account has been rejected. Please contact an administrator.";
+    }
+    if (msg.includes("Only admins can change app roles")) {
+      return "Role changes must be done by an administrator. Your profile has been saved with your current role.";
     }
     if (msg.includes("Unauthorized: Only users can save profiles")) {
       return "Authentication error. Please log out and log in again.";
@@ -96,13 +112,16 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
 
     try {
       // Step 1: Save profile
-      // NOTE: Admin role is auto-assigned by the backend if the email is in the secondary admin
+      // If the user already has a profile, always send the existing role back
+      // to avoid the backend "Only admins can change app roles" permission error.
+      // Admin role is auto-assigned by the backend if the email is in the secondary admin
       // allowlist — the frontend sends the user-selected role; the backend overrides to admin
-      // if applicable. Admin is not selectable in the UI.
+      // if applicable.
+      const roleToSend = existingProfile?.appRole ?? selectedRole;
       await saveProfile.mutateAsync({
         name: name.trim(),
         email: email.trim(),
-        appRole: selectedRole,
+        appRole: roleToSend,
         department: department.trim(),
       });
 
@@ -228,7 +247,7 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 <Select
                   value={selectedRole}
                   onValueChange={(val) => setSelectedRole(val as AppRole)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !!existingProfile}
                 >
                   <SelectTrigger id="role" data-ocid="profile.select">
                     <SelectValue placeholder="Select your role" />
@@ -244,7 +263,15 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
                     <SelectItem value={AppRole.admin}>Admin</SelectItem>
                   </SelectContent>
                 </Select>
-                {selectedRole === AppRole.admin ? (
+                {existingProfile ? (
+                  <div className="flex items-start gap-1.5 mt-1 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Your role has been assigned. Contact an admin to change
+                      it.
+                    </p>
+                  </div>
+                ) : selectedRole === AppRole.admin ? (
                   <div className="flex items-start gap-1.5 mt-1 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
                     <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                     <p className="text-xs text-amber-700 dark:text-amber-300">
