@@ -23,7 +23,6 @@ import { AppRole } from "../backend";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetCallerUserProfile,
-  useRequestApproval,
   useSaveCallerUserProfile,
 } from "../hooks/useQueries";
 
@@ -42,7 +41,6 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
 
   const { data: existingProfile } = useGetCallerUserProfile();
   const saveProfile = useSaveCallerUserProfile();
-  const requestApproval = useRequestApproval();
 
   // When an existing profile loads, initialize the role selector from it
   // so we never send a different role and trigger the backend permission error.
@@ -55,7 +53,7 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
     }
   }, [existingProfile]);
 
-  const isSubmitting = saveProfile.isPending || requestApproval.isPending;
+  const isSubmitting = saveProfile.isPending;
 
   const parseBackendError = (err: unknown): string => {
     const msg = err instanceof Error ? err.message : String(err);
@@ -111,12 +109,8 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
     }
 
     try {
-      // Step 1: Save profile
-      // If the user already has a profile, always send the existing role back
-      // to avoid the backend "Only admins can change app roles" permission error.
-      // Admin role is auto-assigned by the backend if the email is in the secondary admin
-      // allowlist — the frontend sends the user-selected role; the backend overrides to admin
-      // if applicable.
+      // Save profile — always send existing role back if profile exists
+      // to avoid the backend "Only admins can change app roles" error.
       const roleToSend = existingProfile?.appRole ?? selectedRole;
       await saveProfile.mutateAsync({
         name: name.trim(),
@@ -125,35 +119,11 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
         department: department.trim(),
       });
 
-      // Step 2: Request approval
-      try {
-        await requestApproval.mutateAsync();
-      } catch (approvalErr) {
-        const approvalMsg =
-          approvalErr instanceof Error
-            ? approvalErr.message
-            : String(approvalErr);
-        // If already approved or already has pending request, that's fine
-        if (
-          approvalMsg.includes("already approved") ||
-          approvalMsg.includes("already pending") ||
-          approvalMsg.includes("Admins do not require")
-        ) {
-          // Not a real error — proceed
-        } else {
-          // Profile was saved but approval request failed — still show success
-          // so user knows their profile is saved
-          console.warn(
-            "Approval request failed after profile save:",
-            approvalMsg,
-          );
-        }
-      }
-
+      // Profile saved — go directly to dashboard, no approval needed
       setSuccess(true);
       setTimeout(() => {
         onComplete?.();
-      }, 1500);
+      }, 800);
     } catch (err) {
       setError(parseBackendError(err));
     }
@@ -174,7 +144,7 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
             Complete Your Profile
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Set up your profile to request access to the system.
+            Set up your profile to access the system.
           </CardDescription>
         </CardHeader>
 
@@ -183,11 +153,7 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
             <div className="flex flex-col items-center gap-4 py-6">
               <CheckCircle className="w-12 h-12 text-green-500" />
               <p className="text-center text-foreground font-medium">
-                Profile saved! Your approval request has been submitted.
-              </p>
-              <p className="text-center text-muted-foreground text-sm">
-                An administrator will review your request. You'll be notified
-                once approved.
+                Profile saved! Opening dashboard...
               </p>
             </div>
           ) : (
@@ -306,12 +272,10 @@ export default function ProfileSetup({ onComplete }: ProfileSetupProps) {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {saveProfile.isPending
-                        ? "Saving Profile..."
-                        : "Requesting Approval..."}
+                      Saving Profile...
                     </>
                   ) : (
-                    "Save Profile & Request Approval"
+                    "Save Profile & Enter"
                   )}
                 </Button>
 
